@@ -57,7 +57,7 @@ func (m TextInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m TextInputModel) View() string {
 	return fmt.Sprintf(
-		"What’s your favorite Pokémon?\n\n%s\n\n%s",
+		"Enter a URL to start download\n\n%s\n\n%s",
 		m.textInput.View(),
 		"(esc to quit)",
 	) + "\n"
