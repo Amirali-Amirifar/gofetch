@@ -132,8 +132,13 @@ func (m model) View() string {
 
 func (m model) initializeChildren() tea.Model {
 	m.children = []tea.Model{nil, nil, nil}
-	m.children[0] = views.InitialModel()
-	m.children[0].Init()
+	m.children[0] = views.InitDownloads()
+	m.children[1] = views.InitDownloadList()
+	m.children[2] = views.InitQueueList()
+
+	for i := range m.children {
+		m.children[i].Init()
+	}
 
 	return m
 }

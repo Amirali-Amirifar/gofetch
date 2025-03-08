@@ -18,7 +18,7 @@ type TextInputModel struct {
 	err       error
 }
 
-func InitialModel() TextInputModel {
+func InitDownloads() TextInputModel {
 	ti := textinput.New()
 	ti.Placeholder = "https://..."
 	ti.Focus()
