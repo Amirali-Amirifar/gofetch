@@ -1,31 +1,29 @@
 package tui
 
 import (
+	"strings"
+
+	"github.com/Amirali-Amirifar/gofetch.git/internal/models"
 	"github.com/Amirali-Amirifar/gofetch.git/internal/tui/views"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"strings"
 )
 
 type model struct {
 	Tabs      []string
 	children  []tea.Model
 	activeTab int
-	isFocused bool
-
-	// Terminal size
-	width  int
-	height int
+	width     int
+	height    int
+	state     models.AppState
 }
 
 func (m model) Init() tea.Cmd {
-	return m.children[0].Init()
+	return nil
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
-
-	m.children[m.activeTab], _ = m.children[m.activeTab].Update(msg)
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -33,7 +31,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 
 	case tea.KeyMsg:
-		switch keypress := msg.String(); keypress {
+		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
 		case "right", "l", "n", "tab":
@@ -42,9 +40,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "left", "h", "p", "shift+tab":
 			m.activeTab = max(m.activeTab-1, 0)
 			return m, nil
+		case "f1":
+			m.activeTab = 0
+			return m, nil
+		case "f2":
+			m.activeTab = 1
+			return m, nil
+		case "f3":
+			m.activeTab = 2
+			return m, nil
 		}
 	}
 
+	// Delegate update to the active view
+	m.children[m.activeTab], cmd = m.children[m.activeTab].Update(msg)
 	return m, cmd
 }
 
@@ -131,34 +140,27 @@ func (m model) View() string {
 }
 
 func (m model) initializeChildren() tea.Model {
+	// Initialize child models with the loaded state
 	m.children = []tea.Model{nil, nil, nil}
-	m.children[0] = views.InitDownloads()
-	m.children[1] = views.InitDownloadList()
-	m.children[2] = views.InitQueueList()
+	m.children[0] = views.InitDownloads(m.state)    // New Download tab
+	m.children[1] = views.InitDownloadList(m.state) // Downloads List tab
+	m.children[2] = views.InitQueueList(m.state)    // Queues List tab
 
+	// Initialize all child models
 	for i := range m.children {
 		m.children[i].Init()
 	}
 
 	return m
 }
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func GetTui() *tea.Program {
+func GetTui(state models.AppState) *tea.Program {
 	tabs := []string{"New Download", "Downloads List", "Queues List"}
-	m := model{Tabs: tabs}.initializeChildren()
+	m := model{
+		Tabs:      tabs,
+		activeTab: 1, // Default to Downloads List tab
+		state:     state,
+	}.initializeChildren()
 
 	return tea.NewProgram(m)
 }

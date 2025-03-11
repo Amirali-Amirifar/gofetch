@@ -1,24 +1,20 @@
 package views
 
-// A simple program demonstrating the text input component from the Bubbles
-// component library.
-
 import (
 	"fmt"
+
+	"github.com/Amirali-Amirifar/gofetch.git/internal/models"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-type (
-	errMsg error
-)
-
 type TextInputModel struct {
 	textInput textinput.Model
+	state     models.AppState
 	err       error
 }
 
-func InitDownloads() TextInputModel {
+func InitDownloads(state models.AppState) TextInputModel {
 	ti := textinput.New()
 	ti.Placeholder = "https://..."
 	ti.Focus()
@@ -27,6 +23,7 @@ func InitDownloads() TextInputModel {
 
 	return TextInputModel{
 		textInput: ti,
+		state:     state,
 		err:       nil,
 	}
 }
@@ -41,12 +38,20 @@ func (m TextInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.Type {
-		case tea.KeyEnter, tea.KeyCtrlC, tea.KeyEsc:
+		case tea.KeyEnter:
+			// Add the URL to the downloads list in the state
+			url := m.textInput.Value()
+			m.state.Downloads = append(m.state.Downloads, models.Download{
+				URL:    url,
+				Queue:  "Default", // Default queue for now
+				Status: "Pending",
+			})
+			return m, tea.Quit
+		case tea.KeyCtrlC, tea.KeyEsc:
 			return m, tea.Quit
 		}
 
-	// We handle errors just like any other message
-	case errMsg:
+	case error:
 		m.err = msg
 		return m, nil
 	}

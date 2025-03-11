@@ -1,12 +1,19 @@
 package main
 
 import (
-	"fmt"
 	"github.com/Amirali-Amirifar/gofetch.git/internal/tui"
 )
 
 func main() {
-	if _, err := tui.GetTui().Run(); err != nil {
-		fmt.Println(err)
+	// Load or initialize the AppState
+	state, err := tui.LoadAppState()
+	if err != nil {
+		panic(err)
+	}
+
+	// Start the TUI
+	program := tui.GetTui(state)
+	if err := program.Start(); err != nil {
+		panic(err)
 	}
 }
