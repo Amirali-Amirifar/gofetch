@@ -129,11 +129,11 @@ func (m *queueListModel) updateTableRows() {
 }
 
 func (m *queueListModel) saveQueuesToFile() error {
-	data, err := json.MarshalIndent(m.state.Queues, "", "  ")
+	data, err := json.MarshalIndent(m.state, "", "  ")
 	if err != nil {
-		return fmt.Errorf("error marshaling queues: %w", err)
+		return fmt.Errorf("error marshaling state: %w", err)
 	}
-	if err := os.WriteFile("queues.json", data, 0644); err != nil {
+	if err := os.WriteFile("state.json", data, 0644); err != nil {
 		return fmt.Errorf("error writing to file: %w", err)
 	}
 	return nil

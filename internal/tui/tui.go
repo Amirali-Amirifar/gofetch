@@ -34,19 +34,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
-		case "right", "l", "n", "tab":
+		case "right", "tab":
 			m.activeTab = min(m.activeTab+1, len(m.Tabs)-1)
 			return m, nil
-		case "left", "h", "p", "shift+tab":
+		case "left", "shift+tab":
 			m.activeTab = max(m.activeTab-1, 0)
 			return m, nil
-		case "f1":
+		case "1":
 			m.activeTab = 0
 			return m, nil
-		case "f2":
+		case "2":
 			m.activeTab = 1
 			return m, nil
-		case "f3":
+		case "3":
 			m.activeTab = 2
 			return m, nil
 		}

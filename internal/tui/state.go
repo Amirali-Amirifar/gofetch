@@ -8,7 +8,7 @@ import (
 	"github.com/Amirali-Amirifar/gofetch.git/internal/models"
 )
 
-const stateFile = "queues.json"
+const stateFile = "state.json"
 
 func LoadAppState() (models.AppState, error) {
 	var state models.AppState
@@ -40,13 +40,17 @@ func LoadAppState() (models.AppState, error) {
 	return state, nil
 }
 
+// SaveAppState saves the entire application state to a single file.
 func SaveAppState(state models.AppState) error {
 	data, err := json.MarshalIndent(state, "", "  ")
 	if err != nil {
 		return fmt.Errorf("error marshaling state: %w", err)
 	}
+
+	// Directly check the error returned by os.WriteFile
 	if err := os.WriteFile(stateFile, data, 0644); err != nil {
 		return fmt.Errorf("error writing state file: %w", err)
 	}
+
 	return nil
 }

@@ -13,10 +13,11 @@ type Queue struct {
 }
 
 type Download struct {
-	URL      string `json:"url"`
+	URL      string `json":"url"`
 	Queue    string `json:"queue"`
-	Status   string `json:"status"`   // "Pending", "Downloading", "Paused", "Completed", "Failed"
-	Progress int    `json:"progress"` // Percentage (0-100)
+	FileName string `json:"file_name"`
+	Status   string `json:"status"`
+	Progress int    `json:"progress"`
 }
 
 type AppState struct {
