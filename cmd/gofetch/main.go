@@ -1,14 +1,21 @@
 package main
 
 import (
-	"log"
-
+	"github.com/Amirali-Amirifar/gofetch.git/internal/repository/json"
 	"github.com/Amirali-Amirifar/gofetch.git/internal/tui"
+	log "github.com/sirupsen/logrus"
+	"os"
 )
 
 func main() {
+	logFile, err := os.OpenFile("app.log", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0666)
+	if err != nil {
+		log.Fatal("Failed to open log file:", err)
+	}
+	log.SetOutput(logFile)
+
 	// Load or initialize the AppState
-	state, err := tui.LoadAppState()
+	state, err := json.LoadAppState()
 	if err != nil {
 		log.Fatalf("Failed to load app state: %v", err)
 	}

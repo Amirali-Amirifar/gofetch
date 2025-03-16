@@ -12,14 +12,6 @@ type Queue struct {
 	TimeRange string `json:"time_range"`
 }
 
-type Download struct {
-	URL      string `json":"url"`
-	Queue    string `json:"queue"`
-	FileName string `json:"file_name"`
-	Status   string `json:"status"`
-	Progress int    `json:"progress"`
-}
-
 type AppState struct {
 	Queues    []Queue    `json:"queues"`
 	Downloads []Download `json:"downloads"`

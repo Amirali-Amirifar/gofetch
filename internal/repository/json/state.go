@@ -1,14 +1,15 @@
-package tui
+package json
 
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/Amirali-Amirifar/gofetch.git/internal/config"
 	"os"
 
 	"github.com/Amirali-Amirifar/gofetch.git/internal/models"
 )
 
-const stateFile = "state.json"
+const stateFile = config.StateFile
 
 func LoadAppState() (models.AppState, error) {
 	var state models.AppState
@@ -18,7 +19,7 @@ func LoadAppState() (models.AppState, error) {
 		// Create default state if file doesn't exist
 		state = models.AppState{
 			Queues: []models.Queue{
-				{Name: "Default", Folder: "~/Downloads", MaxDL: 3, Speed: "Unlimited", TimeRange: "24/7"},
+				{Name: config.DefaultQueueName, Folder: config.DefaultDownloadFolder, MaxDL: 3, Speed: config.DefaultDownloadSpeed, TimeRange: "24/7"},
 			},
 			Downloads: []models.Download{},
 		}

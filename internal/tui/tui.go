@@ -38,24 +38,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.isFocusedTab = !m.isFocusedTab
 			m.HelpComponent = m.HelpComponent.SetIsFocusedTab(m.isFocusedTab)
 			return m, nil
-		case "ctrl+c", "q":
-			return m, tea.Quit
-		case "right", "tab":
-			return m.handleTabChange(min(m.activeTab+1, len(m.Tabs)-1)), nil
-		case "left", "shift+tab":
-			return m.handleTabChange(max(m.activeTab-1, 0)), nil
-		case "1":
-			return m.handleTabChange(0), nil
-		case "2":
-			return m.handleTabChange(1), nil
-		case "3":
-			return m.handleTabChange(2), nil
-		case "?":
-			updatedHelp, helpCmd := m.HelpComponent.Update(msg)
-			if help, ok := updatedHelp.(components.HelpModel); ok {
-				m.HelpComponent = help
-			}
-			return m, helpCmd
+
 		}
 	}
 
@@ -68,6 +51,30 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			panic(`invalid child model`)
 		}
 		return m, cmd
+	} else {
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			switch msg.String() {
+			case "ctrl+c", "q":
+				return m, tea.Quit
+			case "right", "tab":
+				return m.handleTabChange(min(m.activeTab+1, len(m.Tabs)-1)), nil
+			case "left", "shift+tab":
+				return m.handleTabChange(max(m.activeTab-1, 0)), nil
+			case "1":
+				return m.handleTabChange(0), nil
+			case "2":
+				return m.handleTabChange(1), nil
+			case "3":
+				return m.handleTabChange(2), nil
+			case "?":
+				updatedHelp, helpCmd := m.HelpComponent.Update(msg)
+				if help, ok := updatedHelp.(components.HelpModel); ok {
+					m.HelpComponent = help
+				}
+				return m, helpCmd
+			}
+		}
 	}
 
 	return m, cmd

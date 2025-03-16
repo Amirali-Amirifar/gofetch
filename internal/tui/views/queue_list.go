@@ -63,15 +63,12 @@ func (m queueListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "esc":
-			m.focused = !m.focused
+		case ":":
 			if m.focused {
 				m.table.Focus()
 			} else {
 				m.table.Blur()
 			}
-		case "q", "ctrl+c":
-			return m, tea.Quit
 		case "n": // Add new queue
 			newQueue := models.Queue{Name: "New Queue", Folder: "~/Downloads", MaxDL: 3, Speed: "1MB/s", TimeRange: "Anytime"}
 			m.state.Queues = append(m.state.Queues, newQueue)
