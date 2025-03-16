@@ -14,6 +14,10 @@ type downloadListModel struct {
 	state models.AppState
 }
 
+func (m downloadListModel) GetName() string {
+	return "New Download"
+}
+
 func InitDownloadList(state models.AppState) downloadListModel {
 	columns := []table.Column{
 		{Title: "URL", Width: 50},

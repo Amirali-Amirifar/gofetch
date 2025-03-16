@@ -17,6 +17,10 @@ type queueListModel struct {
 	focused bool
 }
 
+func (m queueListModel) GetName() string {
+	return "Queue List"
+}
+
 func InitQueueList(state models.AppState) queueListModel {
 	columns := []table.Column{
 		{Title: "Name", Width: 15},

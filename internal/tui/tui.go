@@ -11,7 +11,7 @@ import (
 
 type model struct {
 	Tabs      []string
-	children  []tea.Model
+	children  []ChildModel
 	activeTab int
 	width     int
 	height    int
@@ -53,7 +53,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	// Delegate update to the active view
-	m.children[m.activeTab], cmd = m.children[m.activeTab].Update(msg)
+	updatedChild, cmd := m.children[m.activeTab].Update(msg)
+	if updatedChild, ok := updatedChild.(ChildModel); ok {
+		m.children[m.activeTab] = updatedChild
+	} else {
+		panic(`invalid child model`)
+	}
+
 	return m, cmd
 }
 
@@ -141,23 +147,23 @@ func (m model) View() string {
 
 func (m model) initializeChildren() tea.Model {
 	// Initialize child models with the loaded state
-	m.children = []tea.Model{nil, nil, nil}
-	m.children[0] = views.InitDownloads(m.state)    // New Download tab
-	m.children[1] = views.InitDownloadList(m.state) // Downloads List tab
-	m.children[2] = views.InitQueueList(m.state)    // Queues List tab
+	m.children = []ChildModel{
+		views.InitDownloads(m.state),    // New Download tab
+		views.InitDownloadList(m.state), // Downloads List tab
+		views.InitQueueList(m.state),    // Queues List tab
+	}
 
-	// Initialize all child models
-	for i := range m.children {
-		m.children[i].Init()
+	// Populate Tabs dynamically from children's GetName()
+	m.Tabs = make([]string, len(m.children))
+	for i, child := range m.children {
+		m.Tabs[i] = child.GetName()
 	}
 
 	return m
 }
 
 func GetTui(state models.AppState) *tea.Program {
-	tabs := []string{"New Download", "Downloads List", "Queues List"}
 	m := model{
-		Tabs:      tabs,
 		activeTab: 1, // Default to Downloads List tab
 		state:     state,
 	}.initializeChildren()
