@@ -1,0 +1,104 @@
+package components
+
+import (
+	"github.com/charmbracelet/bubbles/help"
+	"github.com/charmbracelet/bubbles/key"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+)
+
+// TabKeyMap holds key bindings for a specific tab
+type TabKeyMap struct {
+	Bindings []key.Binding
+	Name     string
+}
+
+// keyMap defines a set of keybindings. To work for help it must satisfy
+// key.Map.
+type keyMap struct {
+	TabBindings map[string]TabKeyMap
+	Help        key.Binding
+	Quit        key.Binding
+	ActiveTab   string
+}
+
+// ShortHelp returns keybindings to be shown in the mini help view. It's part
+// of the key.Map interface.
+func (k keyMap) ShortHelp() []key.Binding {
+	if tab, ok := k.TabBindings[k.ActiveTab]; ok {
+		return append(tab.Bindings[:2], k.Help, k.Quit)
+	}
+	return []key.Binding{k.Help, k.Quit}
+}
+
+// FullHelp returns keybindings for the expanded help view. It's part of the
+// key.Map interface.
+func (k keyMap) FullHelp() [][]key.Binding {
+	if tab, ok := k.TabBindings[k.ActiveTab]; ok {
+		return [][]key.Binding{
+			tab.Bindings,
+			{k.Help, k.Quit},
+		}
+	}
+	return [][]key.Binding{
+		{k.Help, k.Quit},
+	}
+}
+
+var defaultKeys = keyMap{
+	TabBindings: make(map[string]TabKeyMap),
+	Help: key.NewBinding(
+		key.WithKeys("?"),
+		key.WithHelp("?", "toggle help"),
+	),
+	Quit: key.NewBinding(
+		key.WithKeys("q", "esc", "ctrl+c"),
+		key.WithHelp("q", "quit"),
+	),
+	ActiveTab: "",
+}
+
+type model struct {
+	keys       keyMap
+	help       help.Model
+	inputStyle lipgloss.Style
+	quitting   bool
+}
+
+func NewModel() model {
+	return model{
+		keys:       defaultKeys,
+		help:       help.New(),
+		inputStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#FF75B7")),
+	}
+}
+
+func (m model) Init() tea.Cmd {
+	return nil
+}
+
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		// If we set a width on the help menu it can gracefully truncate
+		// its view as needed.
+		m.help.Width = msg.Width
+	case tea.KeyMsg:
+		switch {
+		case key.Matches(msg, m.keys.Help):
+			m.help.ShowAll = !m.help.ShowAll
+		}
+	}
+
+	return m, nil
+}
+
+func (m model) View() string {
+	var status string
+	helpView := m.help.View(m.keys)
+	return "\n" + status + helpView
+}
+
+func InitHelp() model {
+	return NewModel()
+}
