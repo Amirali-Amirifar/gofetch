@@ -59,10 +59,11 @@ var defaultKeys = keyMap{
 }
 
 type HelpModel struct {
-	keys       keyMap
-	help       help.Model
-	inputStyle lipgloss.Style
-	quitting   bool
+	keys         keyMap
+	help         help.Model
+	inputStyle   lipgloss.Style
+	isFocusedTab bool
+	quitting     bool
 }
 
 func (m HelpModel) Init() tea.Cmd {
@@ -86,11 +87,26 @@ func (m HelpModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m HelpModel) View() string {
-	var status string
 	helpView := m.help.View(m.keys)
-	return "\n" + status + helpView
-}
 
+	// Define focus status
+	status := map[bool]string{true: m.keys.ActiveTab, false: "Normal Mode"}[m.isFocusedTab]
+
+	// Ensure it's aligned to the right
+	width := m.help.Width
+	if width <= 0 {
+		width = 80 // Default fallback width
+	}
+
+	// Trim or pad helpView to align focus status
+	padding := width - lipgloss.Width(helpView) - lipgloss.Width(status) - 4
+	if padding < 0 {
+		padding = 0
+	}
+	spaces := lipgloss.NewStyle().Width(padding).Render("")
+
+	return "\n" + helpView + spaces + status
+}
 func (m HelpModel) SetKeyMap(keyMap map[string]TabKeyMap) HelpModel {
 	m.keys.TabBindings = keyMap
 	return m
@@ -100,6 +116,12 @@ func (m HelpModel) SetActiveTab(activeTab string) HelpModel {
 	m.keys.ActiveTab = activeTab
 	return m
 }
+
+func (m HelpModel) SetIsFocusedTab(isFocused bool) HelpModel {
+	m.isFocusedTab = isFocused
+	return m
+}
+
 func InitHelp() HelpModel {
 	return HelpModel{
 		keys:       defaultKeys,

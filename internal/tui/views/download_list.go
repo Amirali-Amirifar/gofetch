@@ -20,7 +20,7 @@ func (m downloadListModel) GetKeyBinds() []key.Binding {
 }
 
 func (m downloadListModel) GetName() string {
-	return "New Download"
+	return "Download List"
 }
 
 func InitDownloadList(state models.AppState) downloadListModel {

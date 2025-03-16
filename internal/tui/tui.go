@@ -13,6 +13,7 @@ import (
 type model struct {
 	Tabs          []string
 	activeTab     int
+	isFocusedTab  bool
 	width         int
 	height        int
 	state         models.AppState
@@ -27,13 +28,16 @@ func (m model) Init() tea.Cmd {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
+	// Handle cases where tab focus doesn't matter
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
-
+		return m.updateSizeMsg(msg)
 	case tea.KeyMsg:
 		switch msg.String() {
+		case "esc":
+			m.isFocusedTab = !m.isFocusedTab
+			m.HelpComponent = m.HelpComponent.SetIsFocusedTab(m.isFocusedTab)
+			return m, nil
 		case "ctrl+c", "q":
 			return m, tea.Quit
 		case "right", "tab":
@@ -56,11 +60,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	// Delegate update to the active view
-	updatedChild, cmd := m.children[m.activeTab].Update(msg)
-	if child, ok := updatedChild.(ChildModel); ok {
-		m.children[m.activeTab] = child
-	} else {
-		panic(`invalid child model`)
+	if m.isFocusedTab {
+		updatedChild, cmd := m.children[m.activeTab].Update(msg)
+		if child, ok := updatedChild.(ChildModel); ok {
+			m.children[m.activeTab] = child
+		} else {
+			panic(`invalid child model`)
+		}
+		return m, cmd
 	}
 
 	return m, cmd
@@ -148,7 +155,6 @@ func (m model) View() string {
 	doc.WriteString(row)
 	doc.WriteString("\n")
 	doc.WriteString(tabContents)
-
 	doc.WriteString(m.HelpComponent.View())
 
 	return lipgloss.Place(m.width, m.height,
@@ -156,7 +162,7 @@ func (m model) View() string {
 		docStyle.Render(doc.String()))
 }
 
-func (m model) initializeChildren() tea.Model {
+func (m model) initializeChildren() model {
 	// Initialize child models with the loaded state
 	m.children = []ChildModel{
 		views.InitDownloads(m.state),    // New Download tab
@@ -174,14 +180,34 @@ func (m model) initializeChildren() tea.Model {
 
 	m.HelpComponent = components.InitHelp()
 	m.HelpComponent = m.HelpComponent.SetKeyMap(keysMap)
+	m.handleTabChange(1)
 	return m
+}
+
+func (m model) updateSizeMsg(msg tea.WindowSizeMsg) (model, tea.Cmd) {
+	m.width = msg.Width
+	m.height = msg.Height
+	updatedHelp, _ := m.HelpComponent.Update(msg)
+	if help, ok := updatedHelp.(components.HelpModel); ok {
+		m.HelpComponent = help
+	}
+
+	for i, _ := range m.children {
+		updatedChild, _ := m.children[i].Update(msg)
+		if child, ok := updatedChild.(ChildModel); ok {
+			m.children[i] = child
+		} else {
+			panic(`invalid child model`)
+		}
+	}
+	return m, nil
 }
 
 func GetTui(state models.AppState) *tea.Program {
 	m := model{
-		activeTab: 1, // Default to Downloads List tab
-		state:     state,
+		state: state,
 	}.initializeChildren()
+	m = m.handleTabChange(1)
 
 	return tea.NewProgram(m)
 }
