@@ -19,7 +19,11 @@ type queueListModel struct {
 }
 
 func (m queueListModel) GetKeyBinds() []key.Binding {
-	return []key.Binding{}
+	return []key.Binding{
+		key.NewBinding(key.WithKeys("N"), key.WithHelp("N", "New Queue")),
+		key.NewBinding(key.WithKeys("E"), key.WithHelp("E", "Edit")),
+		key.NewBinding(key.WithKeys("D"), key.WithHelp("D", "Delete")),
+	}
 }
 
 func (m queueListModel) GetName() string {
@@ -121,12 +125,7 @@ func (m queueListModel) View() string {
 
 	renderedTable := baseStyle.Render(m.table.View())
 
-	footer := lipgloss.NewStyle().
-		Padding(1, 2).
-		Align(lipgloss.Center).
-		Render("N: New Queue | E: Edit | D: Delete | Q: Quit")
-
-	return lipgloss.JoinVertical(lipgloss.Left, renderedTable, footer)
+	return lipgloss.JoinVertical(lipgloss.Left, renderedTable)
 }
 
 func (m *queueListModel) updateTableRows() {
