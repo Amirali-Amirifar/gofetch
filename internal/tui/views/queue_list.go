@@ -3,6 +3,7 @@ package views
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/charmbracelet/bubbles/key"
 	"os"
 
 	"github.com/Amirali-Amirifar/gofetch.git/internal/models"
@@ -15,6 +16,10 @@ type queueListModel struct {
 	table   table.Model
 	state   models.AppState
 	focused bool
+}
+
+func (m queueListModel) GetKeyBinds() []key.Binding {
+	return []key.Binding{}
 }
 
 func (m queueListModel) GetName() string {

@@ -2,6 +2,7 @@ package views
 
 import (
 	"fmt"
+	"github.com/charmbracelet/bubbles/key"
 
 	"github.com/Amirali-Amirifar/gofetch.git/internal/models"
 	"github.com/charmbracelet/bubbles/table"
@@ -12,6 +13,10 @@ import (
 type downloadListModel struct {
 	table table.Model
 	state models.AppState
+}
+
+func (m downloadListModel) GetKeyBinds() []key.Binding {
+	return []key.Binding{}
 }
 
 func (m downloadListModel) GetName() string {

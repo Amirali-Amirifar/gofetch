@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"github.com/Amirali-Amirifar/gofetch.git/internal/tui/components"
 	"strings"
 
 	"github.com/Amirali-Amirifar/gofetch.git/internal/models"
@@ -10,12 +11,13 @@ import (
 )
 
 type model struct {
-	Tabs      []string
-	children  []ChildModel
-	activeTab int
-	width     int
-	height    int
-	state     models.AppState
+	Tabs          []string
+	activeTab     int
+	width         int
+	height        int
+	state         models.AppState
+	children      []ChildModel
+	HelpComponent components.HelpModel
 }
 
 func (m model) Init() tea.Cmd {
@@ -35,32 +37,39 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c", "q":
 			return m, tea.Quit
 		case "right", "tab":
-			m.activeTab = min(m.activeTab+1, len(m.Tabs)-1)
-			return m, nil
+			return m.handleTabChange(min(m.activeTab+1, len(m.Tabs)-1)), nil
 		case "left", "shift+tab":
-			m.activeTab = max(m.activeTab-1, 0)
-			return m, nil
+			return m.handleTabChange(max(m.activeTab-1, 0)), nil
 		case "1":
-			m.activeTab = 0
-			return m, nil
+			return m.handleTabChange(0), nil
 		case "2":
-			m.activeTab = 1
-			return m, nil
+			return m.handleTabChange(1), nil
 		case "3":
-			m.activeTab = 2
-			return m, nil
+			return m.handleTabChange(2), nil
+		case "?":
+			updatedHelp, helpCmd := m.HelpComponent.Update(msg)
+			if help, ok := updatedHelp.(components.HelpModel); ok {
+				m.HelpComponent = help
+			}
+			return m, helpCmd
 		}
 	}
 
 	// Delegate update to the active view
 	updatedChild, cmd := m.children[m.activeTab].Update(msg)
-	if updatedChild, ok := updatedChild.(ChildModel); ok {
-		m.children[m.activeTab] = updatedChild
+	if child, ok := updatedChild.(ChildModel); ok {
+		m.children[m.activeTab] = child
 	} else {
 		panic(`invalid child model`)
 	}
 
 	return m, cmd
+}
+
+func (m model) handleTabChange(newTab int) model {
+	m.activeTab = newTab
+	m.HelpComponent = m.HelpComponent.SetActiveTab(m.children[m.activeTab].GetName())
+	return m
 }
 
 func tabBorderWithBottom(left, middle, right string) lipgloss.Border {
@@ -140,6 +149,8 @@ func (m model) View() string {
 	doc.WriteString("\n")
 	doc.WriteString(tabContents)
 
+	doc.WriteString(m.HelpComponent.View())
+
 	return lipgloss.Place(m.width, m.height,
 		lipgloss.Center, lipgloss.Center,
 		docStyle.Render(doc.String()))
@@ -155,10 +166,14 @@ func (m model) initializeChildren() tea.Model {
 
 	// Populate Tabs dynamically from children's GetName()
 	m.Tabs = make([]string, len(m.children))
+	keysMap := make(map[string]components.TabKeyMap)
 	for i, child := range m.children {
 		m.Tabs[i] = child.GetName()
+		keysMap[child.GetName()] = components.TabKeyMap{Bindings: child.GetKeyBinds(), Name: child.GetName()}
 	}
 
+	m.HelpComponent = components.InitHelp()
+	m.HelpComponent = m.HelpComponent.SetKeyMap(keysMap)
 	return m
 }
 

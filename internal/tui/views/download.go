@@ -3,6 +3,7 @@ package views
 import (
 	"fmt"
 	"github.com/Amirali-Amirifar/gofetch.git/internal/models"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -11,6 +12,16 @@ type TextInputModel struct {
 	textInput textinput.Model
 	state     models.AppState
 	err       error
+}
+
+func (m TextInputModel) GetKeyBinds() []key.Binding {
+	bindings := []key.Binding{
+		key.NewBinding(
+			key.WithKeys("enter"),
+			key.WithHelp("enter", "select"),
+		),
+	}
+	return bindings
 }
 
 func (m TextInputModel) GetName() string {

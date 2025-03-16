@@ -26,7 +26,7 @@ type keyMap struct {
 // of the key.Map interface.
 func (k keyMap) ShortHelp() []key.Binding {
 	if tab, ok := k.TabBindings[k.ActiveTab]; ok {
-		return append(tab.Bindings[:2], k.Help, k.Quit)
+		return append(tab.Bindings, k.Help, k.Quit)
 	}
 	return []key.Binding{k.Help, k.Quit}
 }
@@ -58,26 +58,18 @@ var defaultKeys = keyMap{
 	ActiveTab: "",
 }
 
-type model struct {
+type HelpModel struct {
 	keys       keyMap
 	help       help.Model
 	inputStyle lipgloss.Style
 	quitting   bool
 }
 
-func NewModel() model {
-	return model{
-		keys:       defaultKeys,
-		help:       help.New(),
-		inputStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#FF75B7")),
-	}
-}
-
-func (m model) Init() tea.Cmd {
+func (m HelpModel) Init() tea.Cmd {
 	return nil
 }
 
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m HelpModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		// If we set a width on the help menu it can gracefully truncate
@@ -93,12 +85,25 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m model) View() string {
+func (m HelpModel) View() string {
 	var status string
 	helpView := m.help.View(m.keys)
 	return "\n" + status + helpView
 }
 
-func InitHelp() model {
-	return NewModel()
+func (m HelpModel) SetKeyMap(keyMap map[string]TabKeyMap) HelpModel {
+	m.keys.TabBindings = keyMap
+	return m
+}
+
+func (m HelpModel) SetActiveTab(activeTab string) HelpModel {
+	m.keys.ActiveTab = activeTab
+	return m
+}
+func InitHelp() HelpModel {
+	return HelpModel{
+		keys:       defaultKeys,
+		help:       help.New(),
+		inputStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#FF75B7")),
+	}
 }
