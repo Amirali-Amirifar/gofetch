@@ -1,5 +1,7 @@
 package models
 
+import "net/http"
+
 type DownloadStatus string
 
 const (
@@ -17,4 +19,5 @@ type Download struct {
 	FileName string         `json:"file_name"`
 	Status   DownloadStatus `json:"status"`
 	Progress int            `json:"progress"`
+	Headers  http.Header    `json:"headers"`
 }

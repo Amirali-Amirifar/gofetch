@@ -1,11 +1,13 @@
 package views
 
 import (
+	"github.com/Amirali-Amirifar/gofetch.git/internal/controller"
 	"github.com/Amirali-Amirifar/gofetch.git/internal/models"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	log "github.com/sirupsen/logrus"
 	"strings"
 )
 
@@ -147,14 +149,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				queue = "Default"
 			}
 
-			// Add the download to the state
-			m.state.Downloads = append(m.state.Downloads, models.Download{
+			// TODO Add the download to the state
+			//m.state.Downloads = append(m.state.Downloads, models.Download{
+			//	URL:      url,
+			//	Queue:    queue,
+			//	FileName: fileName,
+			//	Status:   "Pending",
+			//	Progress: 0,
+			//})
+
+			download := models.Download{
+				FileName: fileName,
 				URL:      url,
 				Queue:    queue,
-				FileName: fileName,
-				Status:   "Pending",
-				Progress: 0,
-			})
+				Status:   models.DownloadStatusQueued,
+			}
+
+			c := &controller.Download{Download: download}
+			c.Create()
+
+			log.Infof("Added download info %#v", download)
 
 			m.clearInputs()
 		case "cancel":
