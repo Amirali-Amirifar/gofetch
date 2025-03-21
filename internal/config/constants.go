@@ -10,4 +10,5 @@ const (
 	DefaultMaxRetryAttempts = 3
 	StateFile               = "state.json"
 	databaseFile            = "sqlite3.db"
+	MaxConcurrentDownloads = 4
 )
