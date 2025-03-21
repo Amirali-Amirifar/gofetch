@@ -1,6 +1,9 @@
 package models
 
-import "net/http"
+import (
+	"net/http"
+	"time"
+)
 
 type DownloadStatus string
 
@@ -27,6 +30,11 @@ type Download struct {
 	AcceptRanges  bool           `json:"accept_ranges" sqliteDb:"accept_ranges"`
 	RangesCount   int            `json:"ranges_count" sqliteDb:"ranges_count"`
 	Ranges        []int          `json:"ranges" sqliteDb:"ranges"`
+	// Exported fields for progress tracking.
+	CurrentProgress int64     // Bytes downloaded so far.
+	StartTime       time.Time // When the download started.
+	// Internal fields.
+	CancelChan chan struct{}
 }
 
 type Queue struct {

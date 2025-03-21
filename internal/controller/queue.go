@@ -55,7 +55,7 @@ func (q *QueueManager) StartDownload(d *Download) {
 	q.DownloadChannel <- struct{}{}
 	d.Status = models.DownloadStatusDownloading
 	log.Infof("Starting download: %s", d.URL)
-	d.start(q)
+	//d.start(q) TODO enable queue
 
 	// Decrement active downloads after completion
 	q.mu.Lock()

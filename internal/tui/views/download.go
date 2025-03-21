@@ -2,8 +2,6 @@ package views
 
 import (
 	"fmt"
-	"time"
-	"strings"
 	"github.com/Amirali-Amirifar/gofetch.git/internal/controller"
 	"github.com/Amirali-Amirifar/gofetch.git/internal/models"
 	"github.com/charmbracelet/bubbles/key"
@@ -12,6 +10,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	log "github.com/sirupsen/logrus"
+	"strings"
+	"time"
 )
 
 // button represents a simple clickable button.
@@ -49,8 +49,7 @@ type model struct {
 	progressVal     float64 // value between 0 and 1.
 	speed           float64 // bytes per second.
 	downloadControl *controller.Download
-	statusMsg    string
-
+	statusMsg       string
 }
 
 func (m model) GetKeyBinds() []key.Binding {
@@ -220,10 +219,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			//})
 
 			download := models.Download{
-				FileName: fileName,
-				URL:      url,
-				Queue:    queue,
-				Status:   models.DownloadStatusQueued,
+				FileName:  fileName,
+				URL:       url,
+				QueueName: queue,
+				Status:    models.DownloadStatusQueued,
 			}
 
 			// Create and start the download.

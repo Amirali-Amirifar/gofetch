@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"github.com/Amirali-Amirifar/gofetch.git/internal/config"
 	"github.com/Amirali-Amirifar/gofetch.git/internal/models"
 	log "github.com/sirupsen/logrus"
@@ -18,19 +19,6 @@ import (
 
 type Download struct {
 	models.Download
-	// Exported fields for progress tracking.
-	ContentLength   int64     // Total size in bytes.
-	CurrentProgress int64     // Bytes downloaded so far.
-	StartTime       time.Time // When the download started.
-
-	// Control channel used to cancel the download.
-	CancelChan chan struct{}
-
-	// Internal fields.
-	contentType  string
-	acceptRanges bool
-	rangesCount  int
-	ranges       []int
 }
 
 // PauseDownload sets the download state to paused.
@@ -83,16 +71,16 @@ func (d *Download) Create() {
 	}
 
 	if contentLength := d.Headers.Get("Content-Length"); contentLength != "" {
-		d.contentLength, err = strconv.ParseInt(contentLength, 10, 64)
+		d.ContentLength, err = strconv.ParseInt(contentLength, 10, 64)
 		if err != nil {
 			log.Errorf("Error parsing Content-Length: %v", err)
-			d.contentLength = 0
+			d.ContentLength = 0
 		}
 	} else {
 		log.Warn("Missing Content-Length header")
 	}
 
-	d.acceptRanges = d.Headers.Get("Accept-Ranges") == "bytes"
+	d.AcceptRanges = d.Headers.Get("Accept-Ranges") == "bytes"
 
 	if contentDisposition := d.Headers.Get("Content-Disposition"); contentDisposition != "" {
 		_, params, err := mime.ParseMediaType(contentDisposition)
@@ -136,7 +124,7 @@ func (d *Download) Create() {
 func (d *Download) start() {
 	// Define a threshold for multi-part downloads (e.g., 10 MB).
 	const multiPartThreshold int64 = 10 * 1024 * 1024
-	if d.acceptRanges && d.ContentLength > multiPartThreshold {
+	if d.AcceptRanges && d.ContentLength > multiPartThreshold {
 		log.Infof("Server supports multi-part and file size (%d bytes) exceeds threshold. Starting parallel download.", d.ContentLength)
 		d.startParallel()
 	} else {
@@ -162,7 +150,6 @@ func uniqueFileName(filePath string) string {
 		}
 	}
 }
-func (d *Download) startParallel() {}
 
 func (d *Download) startSingleThread() {
 	if d.FileName == "" {
