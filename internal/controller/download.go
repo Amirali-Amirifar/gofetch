@@ -134,9 +134,8 @@ func (d *Download) Create() {
 	d.start()
 }
 
-// start selects between single-threaded and multi-part download based on file size and server support.
 func (d *Download) start() {
-	// Define a threshold for multi-part downloads (e.g., 5 MB).
+	// Define a threshold for multi-part downloads (e.g., 10 MB).
 	const multiPartThreshold int64 = 10 * 1024 * 1024
 	if d.acceptRanges && d.ContentLength > multiPartThreshold {
 		log.Infof("Server supports multi-part and file size (%d bytes) exceeds threshold. Starting parallel download.", d.ContentLength)
@@ -147,7 +146,6 @@ func (d *Download) start() {
 	}
 }
 
-// uniqueFileName returns a unique file path by appending a sequential number if the file already exists.
 func uniqueFileName(filePath string) string {
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		return filePath
@@ -167,14 +165,12 @@ func uniqueFileName(filePath string) string {
 	}
 }
 
-// startSingleThread downloads the file using a single HTTP GET request.
 func (d *Download) startSingleThread() {
 	if d.FileName == "" {
 		log.Errorf("No filename provided")
 		d.FileName = "GoFetch_Download.tmp"
 	}
 
-	// Expand the default download folder.
 	downloadFolder := config.DefaultDownloadFolder
 	if strings.HasPrefix(downloadFolder, "~") {
 		homeDir, err := os.UserHomeDir()
