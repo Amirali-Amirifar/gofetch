@@ -2,9 +2,6 @@ package controller
 
 import (
 	"fmt"
-	"github.com/Amirali-Amirifar/gofetch.git/internal/config"
-	"github.com/Amirali-Amirifar/gofetch.git/internal/models"
-	log "github.com/sirupsen/logrus"
 	"io"
 	"mime"
 	"net/http"
@@ -15,16 +12,22 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/Amirali-Amirifar/gofetch.git/internal/config"
+	"github.com/Amirali-Amirifar/gofetch.git/internal/models"
+	log "github.com/sirupsen/logrus"
 )
 
 type Download struct {
 	models.Download
 }
 
+var db = config.GetDB()
+
 // PauseDownload sets the download state to paused.
 func (d *Download) PauseDownload() {
 	if d.Status == models.DownloadStatusDownloading {
-		d.Status = models.DownloadStatusPaused
+		d.updateStatus(models.DownloadStatusPaused)
 		log.Infof("Download paused for %s", d.URL)
 	}
 }
@@ -32,7 +35,7 @@ func (d *Download) PauseDownload() {
 // ResumeDownload resumes a paused download.
 func (d *Download) ResumeDownload() {
 	if d.Status == models.DownloadStatusPaused {
-		d.Status = models.DownloadStatusDownloading
+		d.updateStatus(models.DownloadStatusDownloading)
 		log.Infof("Download resumed for %s", d.URL)
 	}
 }
@@ -40,7 +43,7 @@ func (d *Download) ResumeDownload() {
 // CancelDownload cancels the download.
 func (d *Download) CancelDownload() {
 	if d.Status != models.DownloadStatusCanceled && d.Status != models.DownloadStatusCompleted {
-		d.Status = models.DownloadStatusCanceled
+		d.updateStatus(models.DownloadStatusCanceled)
 		if d.CancelChan != nil {
 			close(d.CancelChan)
 		}
@@ -118,11 +121,21 @@ func (d *Download) Create() {
 	d.CancelChan = make(chan struct{})
 	d.Status = models.DownloadStatusQueued
 
+	err = db.AddNewDownload(&d.Download)
+	if err != nil {
+		log.Errorf("Failed to save download: %v", err)
+	}
 	d.start()
 }
 
 func (d *Download) start() {
-	// Define a threshold for multi-part downloads (e.g., 10 MB).
+	// Define a threshold for multipart downloads (e.g., 10 MB).
+	d.updateStatus(models.DownloadStatusDownloading)
+	err := db.UpdateDownload(&d.Download)
+	if err != nil {
+		log.Errorf("Failed to update download: %v", err)
+		return
+	}
 	const multiPartThreshold int64 = 10 * 1024 * 1024
 	if d.AcceptRanges && d.ContentLength > multiPartThreshold {
 		log.Infof("Server supports multi-part and file size (%d bytes) exceeds threshold. Starting parallel download.", d.ContentLength)
@@ -194,7 +207,7 @@ func (d *Download) startSingleThread() {
 
 	// Record the start time and update status.
 	d.StartTime = time.Now()
-	d.Status = models.DownloadStatusDownloading
+	d.updateStatus(models.DownloadStatusDownloading)
 
 	var totalWritten int64 = 0
 	buf := make([]byte, 32*1024) // 32KB buffer
@@ -220,7 +233,7 @@ func (d *Download) startSingleThread() {
 				log.Fatalf("Error writing to file %s: %v", d.FileName, err2)
 			}
 			totalWritten += int64(written)
-			d.CurrentProgress = totalWritten
+			d.updateProgress(totalWritten)
 		}
 		if err != nil {
 			if err == io.EOF {
@@ -231,7 +244,7 @@ func (d *Download) startSingleThread() {
 	}
 
 	if d.Status != models.DownloadStatusCanceled {
-		d.Status = models.DownloadStatusCompleted
+		d.updateStatus(models.DownloadStatusCompleted)
 		log.Infof("Finished download process for %s, total bytes written: %d", file.Name(), totalWritten)
 	}
 }
@@ -302,7 +315,7 @@ func (d *Download) startParallel() {
 
 	// Record start time and update status.
 	d.StartTime = time.Now()
-	d.Status = models.DownloadStatusDownloading
+	d.updateStatus(models.DownloadStatusDownloading)
 
 	// Start downloading each part concurrently.
 	for i, r := range ranges {
@@ -311,11 +324,12 @@ func (d *Download) startParallel() {
 		tempFiles[i] = tempFileName
 		go d.downloadPart(i, r.start, r.end, tempFileName, progressChan, &wg, errorChan)
 	}
-
+	totalProgress := int64(0)
 	// Aggregate progress from all parts.
 	go func() {
 		for p := range progressChan {
-			d.CurrentProgress += p
+			totalProgress += p
+			d.updateProgress(totalProgress)
 		}
 	}()
 
@@ -355,7 +369,7 @@ func (d *Download) startParallel() {
 	}
 
 	if d.Status != models.DownloadStatusCanceled {
-		d.Status = models.DownloadStatusCompleted
+		d.updateStatus(models.DownloadStatusCompleted)
 		log.Infof("Finished parallel download for %s", d.FileName)
 	}
 }
@@ -409,5 +423,22 @@ func (d *Download) downloadPart(index int, startByte, endByte int64, tempFileNam
 			errorChan <- fmt.Errorf("part %d: %v", index, err)
 			return
 		}
+	}
+}
+
+func (d *Download) updateStatus(status models.DownloadStatus) {
+	d.Status = status
+	func() {
+		err := db.UpdateDownload(&d.Download)
+		if err != nil {
+			log.Errorf("Failed to update download status: %v", err)
+		}
+	}()
+}
+
+func (d *Download) updateProgress(totalWritten int64) {
+	d.CurrentProgress = totalWritten
+	if d.ContentLength != 0 {
+		d.Progress = int(totalWritten/d.ContentLength) * 100
 	}
 }

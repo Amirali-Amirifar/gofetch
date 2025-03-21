@@ -209,20 +209,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
-			// TODO Add the download to the state
-			//m.state.Downloads = append(m.state.Downloads, models.Download{
-			//	URL:      url,
-			//	Queue:    queue,
-			//	FileName: fileName,
-			//	Status:   "Pending",
-			//	Progress: 0,
-			//})
-
 			download := models.Download{
 				FileName:  fileName,
 				URL:       url,
 				QueueName: queue,
-				Status:    models.DownloadStatusQueued,
 			}
 
 			// Create and start the download.

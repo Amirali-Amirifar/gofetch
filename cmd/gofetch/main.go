@@ -1,11 +1,12 @@
 package main
 
 import (
+	"os"
+
 	"github.com/Amirali-Amirifar/gofetch.git/internal/config"
 	"github.com/Amirali-Amirifar/gofetch.git/internal/repository/json"
 	"github.com/Amirali-Amirifar/gofetch.git/internal/tui"
 	log "github.com/sirupsen/logrus"
-	"os"
 )
 
 func main() {

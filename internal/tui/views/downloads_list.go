@@ -75,7 +75,28 @@ func (m downloadListModel) Init() tea.Cmd {
 	return nil
 }
 
+func (m *downloadListModel) updateDownloads() {
+	var rows []table.Row
+	db := config.GetDB()
+	downloads, err := db.GetDownloads()
+	if err != nil {
+		log.Errorf("Failed to fetch downloads: %v", err)
+	}
+
+	for _, download := range downloads {
+		rows = append(rows, table.Row{
+			download.URL,
+			download.QueueName,
+			string(download.Status),
+			fmt.Sprintf("%d%%", download.Progress),
+		})
+	}
+
+	m.table.SetRows(rows)
+}
+
 func (m downloadListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	m.updateDownloads()
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -97,6 +118,7 @@ func (m downloadListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m downloadListModel) View() string {
+	m.updateDownloads()
 	baseStyle := lipgloss.NewStyle().
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("240"))

@@ -68,7 +68,7 @@ func (r *SQLiteRepository) Close() error {
 	return r.Db.Close()
 }
 
-func (r *SQLiteRepository) SaveDownload(download models.Download) error {
+func (r *SQLiteRepository) AddNewDownload(download *models.Download) error {
 	headersJSON, err := json.Marshal(download.Headers)
 	if err != nil {
 		log.Errorf("Error marshaling headers: %v", err)
@@ -81,9 +81,8 @@ func (r *SQLiteRepository) SaveDownload(download models.Download) error {
 		return err
 	}
 
-	_, err = r.Db.Exec(
-		"INSERT OR REPLACE INTO downloads (id, url, queue, file_name, status, progress, headers, content_length, content_type, accept_ranges, ranges_count, ranges) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		download.Id,
+	result, err := r.Db.Exec(
+		"INSERT INTO downloads (url, queue, file_name, status, progress, headers, content_length, content_type, accept_ranges, ranges_count, ranges) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		download.URL,
 		download.QueueID,
 		download.FileName,
@@ -98,6 +97,57 @@ func (r *SQLiteRepository) SaveDownload(download models.Download) error {
 	)
 	if err != nil {
 		log.Errorf("Error saving download: %v", err)
+		return err
+	}
+	download.Id, err = result.LastInsertId()
+	if err != nil {
+		log.Errorf("Error getting Id %#v", err)
+	}
+	return nil
+}
+
+func (r *SQLiteRepository) UpdateDownload(download *models.Download) error {
+	headersJSON, err := json.Marshal(download.Headers)
+	if err != nil {
+		log.Errorf("Error marshaling headers: %v", err)
+		return err
+	}
+
+	rangesJSON, err := json.Marshal(download.Ranges)
+	if err != nil {
+		log.Errorf("Error marshaling ranges: %v", err)
+		return err
+	}
+
+	_, err = r.Db.Exec(
+		`UPDATE downloads SET 
+            url = ?, 
+            queue = ?, 
+            file_name = ?, 
+            status = ?, 
+            progress = ?, 
+            headers = ?,
+            content_length = ?,
+            content_type = ?,
+            accept_ranges = ?,
+            ranges_count = ?,
+            ranges = ?
+        WHERE id = ?`,
+		download.URL,
+		download.QueueID,
+		download.FileName,
+		download.Status,
+		download.Progress,
+		string(headersJSON),
+		download.ContentLength,
+		download.ContentType,
+		download.AcceptRanges,
+		download.RangesCount,
+		string(rangesJSON),
+		download.Id,
+	)
+	if err != nil {
+		log.Errorf("Error updating download: %v", err)
 		return err
 	}
 	return nil
@@ -134,8 +184,6 @@ func (r *SQLiteRepository) GetDownloads() ([]models.Download, error) {
 			log.Errorf("Error getting downloads: %v", err)
 			return nil, err
 		}
-
-		fmt.Println(createdAt)
 
 		if headersJSON != "" {
 			if err := json.Unmarshal([]byte(headersJSON), &download.Headers); err != nil {
