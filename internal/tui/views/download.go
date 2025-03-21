@@ -1,90 +1,128 @@
 package views
 
 import (
+	"fmt"
+	"log"
+	"strings"
+	"time"
+
 	"github.com/Amirali-Amirifar/gofetch.git/internal/controller"
 	"github.com/Amirali-Amirifar/gofetch.git/internal/models"
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	log "github.com/sirupsen/logrus"
-	"strings"
 )
 
-// Simple button representation
+// button represents a simple clickable button.
 type button struct {
 	label  string
 	action string
 }
 
-// Model for the download view
-type model struct {
-	fileNameInput textinput.Model
-	startButton   button
-	cancelButton  button
-	focusIndex    int
-	inputs        []textinput.Model
-	state         models.AppState
-	err           error
+// progressMsg delivers progress updates to the view.
+type progressMsg struct {
+	progress float64 // between 0.0 and 1.0.
+	speed    float64 // bytes per second.
 }
 
-// Message when a button is pressed
+// buttonPressedMsg is sent when a button is clicked.
 type buttonPressedMsg struct {
 	action string
 }
 
-func (m model) GetKeyBinds() []key.Binding {
-	bindings := []key.Binding{
-		key.NewBinding(
-			key.WithKeys("enter"),
-			key.WithHelp("enter", "select/confirm"),
-		),
-		key.NewBinding(
-			key.WithKeys("tab"),
-			key.WithHelp("tab", "next field"),
-		),
-		key.NewBinding(
-			key.WithKeys("shift+tab"),
-			key.WithHelp("shift+tab", "previous field"),
-		),
-	}
-	return bindings
+// model represents the download view.
+type model struct {
+	// Input widgets.
+	inputs     []textinput.Model
+	focusIndex int
+
+	// Action buttons.
+	startButton  button
+	cancelButton button
+
+	// State and progress info.
+	state           models.AppState
+	err             error
+	activeDownload  bool
+	progressBar     progress.Model
+	progressVal     float64 // A value between 0.0 and 1.0.
+	speed           float64 // bytes per second.
+	downloadControl *controller.Download
+	startedAt       time.Time
 }
 
+// GetKeyBinds returns key bindings.
+func (m model) GetKeyBinds() []key.Binding {
+	return []key.Binding{
+		key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "select/confirm")),
+		key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "next field")),
+		key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("shift+tab", "previous field")),
+	}
+}
+
+// GetName returns the view's name.
 func (m model) GetName() string {
 	return "Download Page"
 }
 
+// InitDownloads initializes the view.
 func InitDownloads(state models.AppState) model {
-	urlTextInput := textinput.New()
-	urlTextInput.Placeholder = "https://..."
-	urlTextInput.Focus()
-	urlTextInput.Width = 40
+	// Create input fields.
+	urlInput := textinput.New()
+	urlInput.Placeholder = "https://..."
+	urlInput.Focus()
+	urlInput.Width = 40
 
-	queueTextInput := textinput.New()
-	queueTextInput.Placeholder = "..."
-	queueTextInput.Width = 40
-	queueTextInput.CharLimit = 100
+	queueInput := textinput.New()
+	queueInput.Placeholder = "Queue"
+	queueInput.Width = 40
+	queueInput.CharLimit = 100
 
 	fileNameInput := textinput.New()
 	fileNameInput.Placeholder = "Optional, relative or absolute path"
 	fileNameInput.Width = 40
 
-	// Store inputs in a slice for easier focus cycling
-	inputs := []textinput.Model{urlTextInput, queueTextInput, fileNameInput}
+	inputs := []textinput.Model{urlInput, queueInput, fileNameInput}
+	prog := progress.New(progress.WithDefaultGradient())
 
 	return model{
-		startButton:  button{label: "Start Download", action: "start"},
-		cancelButton: button{label: "Cancel", action: "cancel"},
-		inputs:       inputs,
-		focusIndex:   0, // Start with URL input focused
-		state:        state,
-		err:          nil,
+		startButton:    button{label: "Start Download", action: "start"},
+		cancelButton:   button{label: "Cancel", action: "cancel"},
+		inputs:         inputs,
+		focusIndex:     0,
+		state:          state,
+		err:            nil,
+		activeDownload: false,
+		progressBar:    prog,
+		progressVal:    0,
+		speed:          0,
 	}
 }
 
+// Init is the Bubble Tea initialization.
 func (m model) Init() tea.Cmd {
-	return textinput.Blink
+	return tea.Batch(textinput.Blink)
+}
+
+// pollDownloadProgressCmd polls the active download for progress.
+func pollDownloadProgressCmd(c *controller.Download) tea.Cmd {
+	return tea.Tick(500*time.Millisecond, func(t time.Time) tea.Msg {
+		progFloat := 0.0
+		if c.ContentLength > 0 {
+			progFloat = float64(c.CurrentProgress) / float64(c.ContentLength)
+			if progFloat > 1.0 {
+				progFloat = 1.0
+			}
+		}
+		elapsed := time.Since(c.StartTime)
+		speed := 0.0
+		if elapsed.Seconds() > 0 {
+			speed = float64(c.CurrentProgress) / elapsed.Seconds()
+		}
+		return progressMsg{progress: progFloat, speed: speed}
+	})
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -92,71 +130,62 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "tab":
-			// Cycle focus between inputs and buttons
-			if m.focusIndex < len(m.inputs) {
-				// Currently on an input, blur it
-				m.inputs[m.focusIndex].Blur()
+			if !m.activeDownload {
+				if m.focusIndex < len(m.inputs) {
+					m.inputs[m.focusIndex].Blur()
+				}
+				m.focusIndex = (m.focusIndex + 1) % (len(m.inputs) + 2) // +2 for buttons.
+				if m.focusIndex < len(m.inputs) {
+					m.inputs[m.focusIndex].Focus()
+				}
 			}
-
-			m.focusIndex = (m.focusIndex + 1) % (len(m.inputs) + 2) // +2 for the two buttons
-
-			if m.focusIndex < len(m.inputs) {
-				// Focus the next input if it's an input
-				m.inputs[m.focusIndex].Focus()
-			}
-
-			return m, nil
+			return m, tea.ClearScreen
 		case "shift+tab":
-			// Cycle focus between inputs and buttons backward
-			if m.focusIndex < len(m.inputs) {
-				// Currently on an input, blur it
-				m.inputs[m.focusIndex].Blur()
+			if !m.activeDownload {
+				if m.focusIndex < len(m.inputs) {
+					m.inputs[m.focusIndex].Blur()
+				}
+				m.focusIndex = (m.focusIndex - 1 + (len(m.inputs) + 2)) % (len(m.inputs) + 2)
+				if m.focusIndex < len(m.inputs) {
+					m.inputs[m.focusIndex].Focus()
+				}
 			}
-
-			// Go back one step (with wrapping)
-			m.focusIndex = (m.focusIndex - 1 + (len(m.inputs) + 2)) % (len(m.inputs) + 2)
-
-			if m.focusIndex < len(m.inputs) {
-				// Focus the previous input if it's an input
-				m.inputs[m.focusIndex].Focus()
-			}
-
-			return m, nil
-
+			return m, tea.ClearScreen
 		case "enter":
-			// Handle button presses when focused on buttons
-			if m.focusIndex == len(m.inputs) { // Start button
-				return m, func() tea.Msg {
-					// This is where you'd implement the actual download logic
-					return buttonPressedMsg{action: m.startButton.action}
+			cmds := []tea.Cmd{tea.ClearScreen}
+			if !m.activeDownload {
+				if m.focusIndex == len(m.inputs) {
+					cmds = append(cmds, func() tea.Msg {
+						return buttonPressedMsg{action: m.startButton.action}
+					})
+				} else if m.focusIndex == len(m.inputs)+1 {
+					cmds = append(cmds, func() tea.Msg {
+						return buttonPressedMsg{action: m.cancelButton.action}
+					})
 				}
-			} else if m.focusIndex == len(m.inputs)+1 { // Cancel button
-				return m, func() tea.Msg {
-					return buttonPressedMsg{action: m.cancelButton.action}
-				}
+			}
+			return m, tea.Batch(cmds...)
+		case "q":
+			if m.activeDownload {
+				m.activeDownload = false
+				m.progressVal = 0
+				return m, tea.ClearScreen
 			}
 		}
-
 	case buttonPressedMsg:
 		switch msg.action {
 		case "start":
-			// Handle start download action
+			m.activeDownload = true
+			m.progressVal = 0
+			m.speed = 0
+
+			// Gather input values.
 			url := m.inputs[0].Value()
 			queue := m.inputs[1].Value()
 			fileName := m.inputs[2].Value()
-
 			if queue == "" {
 				queue = "Default"
 			}
-
-			// TODO Add the download to the state
-			//m.state.Downloads = append(m.state.Downloads, models.Download{
-			//	URL:      url,
-			//	Queue:    queue,
-			//	FileName: fileName,
-			//	Status:   "Pending",
-			//	Progress: 0,
-			//})
 
 			download := models.Download{
 				FileName: fileName,
@@ -165,88 +194,91 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				Status:   models.DownloadStatusQueued,
 			}
 
-			c := &controller.Download{Download: download}
-			c.Create()
+			// Create and start the download.
+			ctrl := &controller.Download{Download: download}
+			m.downloadControl = ctrl
+			// Run in a separate goroutine so the UI isn’t blocked.
+			go ctrl.Create()
+			log.Printf("Started download: %#v", download)
 
-			log.Infof("Added download info %#v", download)
+			// Begin polling for progress.
+			return m, pollDownloadProgressCmd(ctrl)
 
-			m.clearInputs()
 		case "cancel":
-			m.clearInputs()
+			return m, tea.ClearScreen
 		}
-
+	case progressMsg:
+		m.progressVal = msg.progress
+		m.speed = msg.speed
+		// Keep polling until complete.
+		if m.progressVal < 1.0 {
+			if m.downloadControl != nil {
+				return m, pollDownloadProgressCmd(m.downloadControl)
+			}
+		}
+		m.activeDownload = false
+		m.progressVal = 1.0
+		return m, nil
 	case error:
 		m.err = msg
 		return m, nil
 	}
 
-	// Handle updates to the currently focused input
-	var cmd tea.Cmd
-
-	// Update all inputs but only the focused one will actually respond to typing
-	for i := range m.inputs {
-		m.inputs[i], cmd = m.inputs[i].Update(msg)
+	var cmds []tea.Cmd
+	if !m.activeDownload {
+		for i := range m.inputs {
+			var cmd tea.Cmd
+			m.inputs[i], cmd = m.inputs[i].Update(msg)
+			cmds = append(cmds, cmd)
+		}
 	}
 
-	return m, cmd
+	newModel, progCmd := m.progressBar.Update(msg)
+	if pb, ok := newModel.(progress.Model); ok {
+		m.progressBar = pb
+	}
+	cmds = append(cmds, progCmd)
+	return m, tea.Batch(cmds...)
 }
 
+// View renders the UI.
 func (m model) View() string {
-	doc := strings.Builder{}
+	var b strings.Builder
 	docStyles := lipgloss.NewStyle().
-		Padding(4).
-		Border(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("#ffffff")).
-		Foreground(lipgloss.Color("1"))
+		Padding(2).
+		Border(lipgloss.DoubleBorder()).
+		BorderForeground(lipgloss.Color("205")).
+		Foreground(lipgloss.Color("229"))
 
-	// Style definitions
-	normalButton := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#FFFFFF")).
-		Background(lipgloss.Color("#888888")).
-		Padding(0, 3).
-		Margin(0, 1)
-
-	focusedButton := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#000000")).
-		Background(lipgloss.Color("#00FF00")).
-		Padding(0, 3).
-		Margin(0, 1)
-
-	// Build the view
-	doc.WriteString("URL: ")
-	doc.WriteString(m.inputs[0].View())
-	doc.WriteString("\n\n")
-
-	doc.WriteString("Queue: ")
-	doc.WriteString(m.inputs[1].View())
-	doc.WriteString("\n\n")
-
-	doc.WriteString("File Name: ")
-	doc.WriteString(m.inputs[2].View())
-	doc.WriteString("\n\n")
-
-	// Render buttons with appropriate styles
-	startButtonStyle := normalButton
-	if m.focusIndex == len(m.inputs) {
-		startButtonStyle = focusedButton
+	if m.activeDownload {
+		b.WriteString("Download in progress...\n\n")
+		b.WriteString(m.progressBar.ViewAs(m.progressVal))
+		b.WriteString(fmt.Sprintf("\nSpeed: %.2f bytes/s\n", m.speed))
+		b.WriteString("\n(Press 'q' to quit progress view)")
+		return docStyles.Render(b.String())
 	}
 
-	cancelButtonStyle := normalButton
-	if m.focusIndex == len(m.inputs)+1 {
-		cancelButtonStyle = focusedButton
+	b.WriteString("URL: " + m.inputs[0].View() + "\n\n")
+	b.WriteString("Queue: " + m.inputs[1].View() + "\n\n")
+	b.WriteString("File Name: " + m.inputs[2].View() + "\n\n")
+
+	normalStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("7")).Background(lipgloss.Color("240")).Padding(0, 2)
+	focusedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("0")).Background(lipgloss.Color("229")).Padding(0, 2)
+
+	btns := []string{
+		func() string {
+			if m.focusIndex == len(m.inputs) {
+				return focusedStyle.Render(m.startButton.label)
+			}
+			return normalStyle.Render(m.startButton.label)
+		}(),
+		func() string {
+			if m.focusIndex == len(m.inputs)+1 {
+				return focusedStyle.Render(m.cancelButton.label)
+			}
+			return normalStyle.Render(m.cancelButton.label)
+		}(),
 	}
-
-	doc.WriteString(startButtonStyle.Render(m.startButton.label))
-	doc.WriteString(cancelButtonStyle.Render(m.cancelButton.label))
-
-	doc.WriteString("\n\n")
-	doc.WriteString("(Tab to switch fields, Enter to confirm)")
-
-	return docStyles.Render(doc.String())
-}
-
-func (m model) clearInputs() {
-	for i := range m.inputs {
-		m.inputs[i].SetValue("")
-	}
+	b.WriteString(strings.Join(btns, "  "))
+	return docStyles.Render(b.String())
 }
