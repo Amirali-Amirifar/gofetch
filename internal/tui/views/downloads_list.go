@@ -2,12 +2,14 @@ package views
 
 import (
 	"fmt"
-	"github.com/charmbracelet/bubbles/key"
 
+	"github.com/Amirali-Amirifar/gofetch.git/internal/config"
 	"github.com/Amirali-Amirifar/gofetch.git/internal/models"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	log "github.com/sirupsen/logrus"
 )
 
 type downloadListModel struct {
@@ -32,7 +34,13 @@ func InitDownloadList(state models.AppState) downloadListModel {
 	}
 
 	var rows []table.Row
-	for _, download := range state.Downloads {
+	db := config.GetDB()
+	downloads, err := db.GetDownloads()
+	if err != nil {
+		log.Errorf("Failed to fetch downloads: %v", err)
+	}
+
+	for _, download := range downloads {
 		rows = append(rows, table.Row{
 			download.URL,
 			download.Queue,

@@ -1,33 +1,4 @@
 {
-  "queues": [
-    {
-      "name": "New Queue",
-      "folder": "~/Downloads",
-      "max_dl": 3,
-      "speed": "1MB/s",
-      "time_range": "Anytime"
-    },
-    {
-      "name": "Edited Queue",
-      "folder": "~/Downloads",
-      "max_dl": 3,
-      "speed": "1MB/s",
-      "time_range": "Anytime"
-    },
-    {
-      "name": "Edited Queue",
-      "folder": "~/Downloads",
-      "max_dl": 3,
-      "speed": "1MB/s",
-      "time_range": "Anytime"
-    },
-    {
-      "name": "Edited Queue",
-      "folder": "~/Downloads",
-      "max_dl": 3,
-      "speed": "1MB/s",
-      "time_range": "Anytime"
-    }
-  ],
+  "queues": [],
   "downloads": []
 }

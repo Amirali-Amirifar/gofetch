@@ -1,6 +1,8 @@
 package views
 
 import (
+	"strings"
+
 	"github.com/Amirali-Amirifar/gofetch.git/internal/controller"
 	"github.com/Amirali-Amirifar/gofetch.git/internal/models"
 	"github.com/charmbracelet/bubbles/key"
@@ -8,7 +10,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	log "github.com/sirupsen/logrus"
-	"strings"
 )
 
 // Simple button representation
@@ -19,13 +20,13 @@ type button struct {
 
 // Model for the download view
 type model struct {
-	fileNameInput textinput.Model
-	startButton   button
-	cancelButton  button
-	focusIndex    int
-	inputs        []textinput.Model
-	state         models.AppState
-	err           error
+	startButton  button
+	cancelButton button
+	focusIndex   int
+	inputs       []textinput.Model
+	state        models.AppState
+	err          error
+	statusMsg    string
 }
 
 // Message when a button is pressed
@@ -145,31 +146,32 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			queue := m.inputs[1].Value()
 			fileName := m.inputs[2].Value()
 
+			if url == "" {
+				m.statusMsg = "Error: URL cannot be empty"
+				return m, nil
+			}
+
 			if queue == "" {
 				queue = "Default"
 			}
-
-			// TODO Add the download to the state
-			//m.state.Downloads = append(m.state.Downloads, models.Download{
-			//	URL:      url,
-			//	Queue:    queue,
-			//	FileName: fileName,
-			//	Status:   "Pending",
-			//	Progress: 0,
-			//})
 
 			download := models.Download{
 				FileName: fileName,
 				URL:      url,
 				Queue:    queue,
 				Status:   models.DownloadStatusQueued,
+				Progress: 0,
 			}
+
+			// Add the download to the state
+			m.state.Downloads = append(m.state.Downloads, download)
 
 			c := &controller.Download{Download: download}
 			c.Create()
 
 			log.Infof("Added download info %#v", download)
 
+			m.statusMsg = "Download has been queued successfully!"
 			m.clearInputs()
 		case "cancel":
 			m.clearInputs()
@@ -240,6 +242,20 @@ func (m model) View() string {
 	doc.WriteString(cancelButtonStyle.Render(m.cancelButton.label))
 
 	doc.WriteString("\n\n")
+
+	// Display status message if present
+	if m.statusMsg != "" {
+		statusStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#00FF00")).
+			Margin(1, 0)
+
+		if strings.HasPrefix(m.statusMsg, "Error") {
+			statusStyle = statusStyle.Foreground(lipgloss.Color("#FF0000"))
+		}
+		doc.WriteString(statusStyle.Render(m.statusMsg))
+		doc.WriteString("\n\n")
+	}
+
 	doc.WriteString("(Tab to switch fields, Enter to confirm)")
 
 	return docStyles.Render(doc.String())

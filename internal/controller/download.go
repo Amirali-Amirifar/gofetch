@@ -1,9 +1,6 @@
 package controller
 
 import (
-	"github.com/Amirali-Amirifar/gofetch.git/internal/config"
-	"github.com/Amirali-Amirifar/gofetch.git/internal/models"
-	log "github.com/sirupsen/logrus"
 	"io"
 	"mime"
 	"net/http"
@@ -12,25 +9,28 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/Amirali-Amirifar/gofetch.git/internal/config"
+	"github.com/Amirali-Amirifar/gofetch.git/internal/models"
+	log "github.com/sirupsen/logrus"
 )
 
 type Download struct {
 	models.Download
-	contentLength int64
-	contentType   string
-	acceptRanges  bool
-	rangesCount   int
-	ranges        []int
 }
 
 func (d *Download) Create() {
 	fileUrl := d.URL
 	log.Infof("Creating download for URL: %s", fileUrl)
 
+	// Set initial status
+	d.Status = models.DownloadStatusQueued
+
 	// Make the request
 	response, err := http.Get(fileUrl)
 	if err != nil {
 		log.Errorf("Failed to fetch URL: %s, error: %v", fileUrl, err)
+		d.Status = models.DownloadStatusFailed
 		return
 	}
 	defer response.Body.Close()
@@ -45,16 +45,16 @@ func (d *Download) Create() {
 	}
 
 	if contentLength := d.Headers.Get("Content-Length"); contentLength != "" {
-		d.contentLength, err = strconv.ParseInt(contentLength, 10, 64)
+		d.ContentLength, err = strconv.ParseInt(contentLength, 10, 64)
 		if err != nil {
 			log.Errorf("Error parsing Content-Length: %v", err)
-			d.contentLength = 0
+			d.ContentLength = 0
 		}
 	} else {
 		log.Warn("Missing Content-Length header")
 	}
 
-	d.acceptRanges = d.Headers.Get("Accept-Ranges") == "bytes"
+	d.AcceptRanges = d.Headers.Get("Accept-Ranges") == "bytes"
 
 	if contentDisposition := d.Headers.Get("Content-Disposition"); contentDisposition != "" {
 		_, params, err := mime.ParseMediaType(contentDisposition)
@@ -87,6 +87,14 @@ func (d *Download) Create() {
 	}
 
 	log.Infof("Completed capturing initial info of %s, the data are %#v", d.URL, d)
+	db := config.GetDB()
+	// Save download to database
+	if err := db.SaveDownload(d.Download); err != nil {
+		log.Errorf("Failed to save download to database: %v", err)
+		d.Status = models.DownloadStatusFailed
+		return
+	}
+
 	log.Infof("\nStarting the download process")
 
 	d.start()
