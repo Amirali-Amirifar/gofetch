@@ -54,37 +54,12 @@ func New(dbPath string) (*SQLiteRepository, error) {
 
 func initDB(db *sql.DB) error {
 	// Create downloads table with enhanced schema
-	_, err := db.Exec(`
-		CREATE TABLE IF NOT EXISTS downloads (
-			id INTEGER PRIMARY KEY,
-			url TEXT NOT NULL,
-			queue TEXT,
-			file_name TEXT,
-			status TEXT,
-			progress INTEGER DEFAULT 0,
-			headers TEXT,
-			content_length INTEGER,
-			content_type TEXT,
-			accept_ranges BOOLEAN,
-			ranges_count INTEGER,
-			ranges TEXT,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-		)
-	`)
+	schema, err := os.ReadFile("schema.sql")
 	if err != nil {
+		log.Errorf("failed to read schema: %s", err)
 		return err
 	}
-
-	// Create queues table
-	_, err = db.Exec(`
-		CREATE TABLE IF NOT EXISTS queues (
-			name TEXT PRIMARY KEY,
-			folder TEXT,
-			max_dl INTEGER,
-			speed TEXT,
-			time_range TEXT
-		)
-	`)
+	_, err = db.Exec(string(schema))
 	return err
 }
 
@@ -128,7 +103,7 @@ func (r *SQLiteRepository) SaveDownload(download models.Download) error {
 }
 
 func (r *SQLiteRepository) GetDownloads() ([]models.Download, error) {
-	rows, err := r.Db.Query("SELECT id, url, queue_id, file_name, status, progress, headers, content_length, content_type, accept_ranges, ranges_count, ranges FROM downloads")
+	rows, err := r.Db.Query("SELECT * FROM downloads")
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +152,7 @@ func (r *SQLiteRepository) LoadAppState() (models.AppState, error) {
 	var state models.AppState
 
 	// Load downloads
-	rows, err := r.Db.Query("SELECT url, queue, file_name, status, progress, headers FROM downloads")
+	rows, err := r.Db.Query("SELECT * FROM downloads")
 	if err != nil {
 		return state, err
 	}
@@ -200,7 +175,7 @@ func (r *SQLiteRepository) LoadAppState() (models.AppState, error) {
 	}
 
 	// Load queues
-	rows, err = r.Db.Query("SELECT name, folder, max_dl, speed, time_range FROM queues")
+	rows, err = r.Db.Query("SELECT * FROM queues")
 	if err != nil {
 		return state, err
 	}
