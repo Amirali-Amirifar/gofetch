@@ -1,8 +1,9 @@
 package config
 
 const (
-	DefaultQueueName      = "Default"
-	DefaultDownloadFolder = "~/Downloads/GoFetch/"
-	DefaultDownloadSpeed  = "Unlimited" // 0 means unlimited
-	StateFile             = "state.json"
+	DefaultQueueName       = "Default"
+	DefaultDownloadFolder  = "~/Downloads/GoFetch/"
+	DefaultDownloadSpeed   = "Unlimited" // 0 means unlimited
+	StateFile              = "state.json"
+	MaxConcurrentDownloads = 4
 )
