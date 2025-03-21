@@ -54,7 +54,7 @@ func New(dbPath string) (*SQLiteRepository, error) {
 
 func initDB(db *sql.DB) error {
 	// Create downloads table with enhanced schema
-	schema, err := os.ReadFile("schema.sql")
+	schema, err := os.ReadFile("./internal/repository/sqliteDb/schema.sql")
 	if err != nil {
 		log.Errorf("failed to read schema: %s", err)
 		return err

@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS downloads (
      ranges_count INTEGER,
      ranges TEXT,
      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-)
+);
 
 CREATE TABLE IF NOT EXISTS queues (
       name TEXT PRIMARY KEY,
@@ -20,4 +20,4 @@ CREATE TABLE IF NOT EXISTS queues (
       max_dl INTEGER,
       speed TEXT,
       time_range TEXT
-)
+);
