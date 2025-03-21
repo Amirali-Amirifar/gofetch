@@ -68,47 +68,38 @@ func (m queueListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case ":":
-			if m.focused {
-				m.table.Focus()
-			} else {
-				m.table.Blur()
+		case "up", "down": // Handle Up and Down keys
+			if !m.editing { // Only navigate queues if not in edit mode
+				m.table, cmd = m.table.Update(msg)
+				return m, cmd
 			}
-		case "n": // Add new queue
-			newQueue := models.Queue{Name: "New Queue", StorageFolder: "~/Downloads", MaxSimultaneous: 3, MaxDownloadSpeed: 1, ActiveTimeStart: "Anytime", ActiveTimeEnd: "Anytime"}
-			m.state.Queues = append(m.state.Queues, newQueue)
-			m.updateTableRows()
-			if err := m.saveQueuesToFile(); err != nil {
-				return m, tea.Printf("Error saving queues: %v", err)
-			}
-		case "e": // Edit selected queue
-			if len(m.state.Queues) == 0 {
-				return m, tea.Printf("No queues available to edit.")
-			}
-			idx := m.table.Cursor()
-			if idx >= 0 && idx < len(m.state.Queues) {
-				m.editing = true
-				m.initEditInputs(idx)
-			} else {
-				return m, tea.Printf("Invalid selection.")
-			}
-		case "d": // Delete selected queue
-			if len(m.state.Queues) == 0 {
-				return m, tea.Printf("No queues available to delete.")
-			}
-			idx := m.table.Cursor()
-			if idx >= 0 && idx < len(m.state.Queues) {
-				m.state.Queues = append(m.state.Queues[:idx], m.state.Queues[idx+1:]...)
-				m.updateTableRows()
-				if err := m.saveQueuesToFile(); err != nil {
-					return m, tea.Printf("Error saving queues: %v", err)
+		case "tab", "shift+tab": // Handle Tab and Shift+Tab
+			if m.editing { // Only navigate fields if in edit mode
+				// Get the currently focused input field index
+				currentIndex := -1
+				for i, input := range m.editInputs {
+					if input.Focused() {
+						currentIndex = i
+						break
+					}
 				}
-			} else {
-				return m, tea.Printf("Invalid selection.")
-			}
-		case "left", "right": // Tab navigation
-			return m, func() tea.Msg {
-				return models.SwitchTabMsg{Direction: msg.String()}
+
+				// Determine the next input field index
+				if msg.String() == "tab" {
+					currentIndex = (currentIndex + 1) % len(m.editInputs) // Move to the next field
+				} else if msg.String() == "shift+tab" {
+					currentIndex = (currentIndex - 1 + len(m.editInputs)) % len(m.editInputs) // Move to the previous field
+				}
+
+				// Update focus
+				for i := range m.editInputs {
+					if i == currentIndex {
+						m.editInputs[i].Focus()
+					} else {
+						m.editInputs[i].Blur()
+					}
+				}
+				return m, nil
 			}
 		case "enter":
 			if m.editing {
@@ -122,6 +113,16 @@ func (m queueListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 			}
+		case "e": // Enter edit mode
+			if !m.editing && len(m.state.Queues) > 0 {
+				m.editing = true
+				m.initEditInputs(m.table.Cursor())
+			}
+		case "esc": // Exit edit mode
+			if m.editing {
+				m.editing = false
+			}
+			// Other key bindings...
 		}
 	}
 
