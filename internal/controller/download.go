@@ -102,9 +102,6 @@ func (d *Download) start(queue *QueueManager) {
 
 // startSingleThread handles downloading the file in a single-threaded manner
 func (d *Download) startSingleThread(queue *QueueManager) {
-	if d.FileName == "" {
-		d.FileName = "GoFetch_Download.tmp"
-	}
 	// Determine the download folder
 	downloadFolder := config.DefaultDownloadFolder
 	if strings.HasPrefix(downloadFolder, "~") {

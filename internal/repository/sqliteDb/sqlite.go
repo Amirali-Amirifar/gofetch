@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/Amirali-Amirifar/gofetch.git/internal/models"
 	_ "github.com/mattn/go-sqlite3"
@@ -113,6 +114,7 @@ func (r *SQLiteRepository) GetDownloads() ([]models.Download, error) {
 	for rows.Next() {
 		var download models.Download
 		var headersJSON, rangesJSON string
+		var createdAt time.Time
 		err := rows.Scan(
 			&download.Id,
 			&download.URL,
@@ -126,10 +128,14 @@ func (r *SQLiteRepository) GetDownloads() ([]models.Download, error) {
 			&download.AcceptRanges,
 			&download.RangesCount,
 			&rangesJSON,
+			&createdAt,
 		)
 		if err != nil {
+			log.Errorf("Error getting downloads: %v", err)
 			return nil, err
 		}
+
+		fmt.Println(createdAt)
 
 		if headersJSON != "" {
 			if err := json.Unmarshal([]byte(headersJSON), &download.Headers); err != nil {
@@ -148,91 +154,93 @@ func (r *SQLiteRepository) GetDownloads() ([]models.Download, error) {
 	return downloads, nil
 }
 
-func (r *SQLiteRepository) LoadAppState() (models.AppState, error) {
-	var state models.AppState
+//
+//func (r *SQLiteRepository) LoadAppState() (models.AppState, error) {
+//	var state models.AppState
+//
+//	// Load downloads
+//	rows, err := r.Db.Query("SELECT * FROM downloads")
+//	if err != nil {
+//		return state, err
+//	}
+//	defer rows.Close()
+//
+//	for rows.Next() {
+//		var download models.Download
+//		var headersJSON string
+//		err := rows.Scan(&download.URL, &download.QueueID, &download.FileName, &download.Status, &download.Progress, &headersJSON)
+//		if err != nil {
+//			return state, err
+//		}
+//		// Parse headers JSON
+//		if headersJSON != "" {
+//			if err := json.Unmarshal([]byte(headersJSON), &download.Headers); err != nil {
+//				return state, err
+//			}
+//		}
+//		state.Downloads = append(state.Downloads, download)
+//	}
+//
+//	// Load queues
+//	rows, err = r.Db.Query("SELECT * FROM queues")
+//	if err != nil {
+//		return state, err
+//	}
+//	defer rows.Close()
+//
+//	for rows.Next() {
+//		var queue models.Queue
+//		err := rows.Scan(&queue.Id, queue.Name, &queue.StorageFolder, &queue.MaxSimultaneous, &queue.BandwidthLimit, &queue.ActiveTimeStart, &queue.ActiveTimeEnd, &queue.MaxRetryAttempts)
+//		if err != nil {
+//			return state, err
+//		}
+//		state.Queues = append(state.Queues, queue)
+//	}
+//
+//	return state, nil
+//}
 
-	// Load downloads
-	rows, err := r.Db.Query("SELECT * FROM downloads")
-	if err != nil {
-		return state, err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var download models.Download
-		var headersJSON string
-		err := rows.Scan(&download.URL, &download.QueueID, &download.FileName, &download.Status, &download.Progress, &headersJSON)
-		if err != nil {
-			return state, err
-		}
-		// Parse headers JSON
-		if headersJSON != "" {
-			if err := json.Unmarshal([]byte(headersJSON), &download.Headers); err != nil {
-				return state, err
-			}
-		}
-		state.Downloads = append(state.Downloads, download)
-	}
-
-	// Load queues
-	rows, err = r.Db.Query("SELECT * FROM queues")
-	if err != nil {
-		return state, err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var queue models.Queue
-		err := rows.Scan(&queue.Id, queue.Name, &queue.StorageFolder, &queue.MaxSimultaneous, &queue.BandwidthLimit, &queue.ActiveTimeStart, &queue.ActiveTimeEnd, &queue.MaxRetryAttempts)
-		if err != nil {
-			return state, err
-		}
-		state.Queues = append(state.Queues, queue)
-	}
-
-	return state, nil
-}
-
-func (r *SQLiteRepository) SaveAppState(state models.AppState) error {
-	tx, err := r.Db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	// Clear existing data
-	if _, err := tx.Exec("DELETE FROM downloads"); err != nil {
-		return err
-	}
-	if _, err := tx.Exec("DELETE FROM queues"); err != nil {
-		return err
-	}
-
-	// Insert downloads
-	for _, download := range state.Downloads {
-		headersJSON, err := json.Marshal(download.Headers)
-		if err != nil {
-			return err
-		}
-		_, err = tx.Exec(
-			"INSERT INTO downloads (url, queue, file_name, status, progress, headers) VALUES (?, ?, ?, ?, ?, ?)",
-			download.URL, download.QueueID, download.FileName, download.Status, download.Progress, string(headersJSON),
-		)
-		if err != nil {
-			return err
-		}
-	}
-
-	// Insert queues
-	for _, queue := range state.Queues {
-		_, err := tx.Exec(
-			"INSERT INTO queues (name, folder, max_dl, speed, time_range) VALUES (?, ?, ?, ?, ?)",
-			queue.Id, queue.Name, queue.StorageFolder, queue.MaxSimultaneous, queue.BandwidthLimit, queue.ActiveTimeStart, queue.ActiveTimeEnd, queue.MaxRetryAttempts,
-		)
-		if err != nil {
-			return err
-		}
-	}
-
-	return tx.Commit()
-}
+//
+//func (r *SQLiteRepository) SaveAppState(state models.AppState) error {
+//	tx, err := r.Db.Begin()
+//	if err != nil {
+//		return err
+//	}
+//	defer tx.Rollback()
+//
+//	// Clear existing data
+//	if _, err := tx.Exec("DELETE FROM downloads"); err != nil {
+//		return err
+//	}
+//	if _, err := tx.Exec("DELETE FROM queues"); err != nil {
+//		return err
+//	}
+//
+//	// Insert downloads
+//	for _, download := range state.Downloads {
+//		headersJSON, err := json.Marshal(download.Headers)
+//		if err != nil {
+//			return err
+//		}
+//		_, err = tx.Exec(
+//			"INSERT INTO downloads (url, queue, file_name, status, progress, headers) VALUES (?, ?, ?, ?, ?, ?)",
+//			download.URL, download.QueueID, download.FileName, download.Status, download.Progress, string(headersJSON),
+//		)
+//		if err != nil {
+//			return err
+//		}
+//	}
+//
+//	// Insert queues
+//	for _, queue := range state.Queues {
+//		_, err := tx.Exec(
+//			"INSERT INTO queues (name, folder, max_dl, speed, time_range) VALUES (?, ?, ?, ?, ?)",
+//			queue.Id, queue.Name, queue.StorageFolder, queue.MaxSimultaneous, queue.BandwidthLimit, queue.ActiveTimeStart, queue.ActiveTimeEnd, queue.MaxRetryAttempts,
+//		)
+//		if err != nil {
+//			return err
+//		}
+//	}
+//
+//	return tx.Commit()
+//}

@@ -26,6 +26,7 @@ func (q *QueueManager) CanStartDownload() bool {
 
 	if q.ActiveTimeStart != "" && q.ActiveTimeEnd != "" {
 		if currentTime.Before(start) || currentTime.After(end) {
+			log.Infof("Can't start download until %s", end)
 			return false
 		}
 	}
