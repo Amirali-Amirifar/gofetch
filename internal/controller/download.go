@@ -17,7 +17,6 @@ import (
 	"time"
 )
 
-// Download encapsulates a download task along with progress and control fields.
 type Download struct {
 	models.Download
 	// Exported fields for progress tracking.
@@ -67,7 +66,7 @@ func (d *Download) Create() {
 	fileUrl := d.URL
 	log.Infof("Creating download for URL: %s", fileUrl)
 
-	// Make a GET request to obtain headers.
+	// Make the request
 	response, err := http.Get(fileUrl)
 	if err != nil {
 		log.Errorf("Failed to fetch URL: %s, error: %v", fileUrl, err)
@@ -81,7 +80,6 @@ func (d *Download) Create() {
 		return
 	}
 
-	// Extract and parse Content-Length.
 	if cl := d.Headers.Get("Content-Length"); cl != "" {
 		d.ContentLength, err = strconv.ParseInt(cl, 10, 64)
 		if err != nil {
