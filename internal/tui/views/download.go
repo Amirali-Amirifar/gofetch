@@ -143,7 +143,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "start":
 			// Handle start download action
 			url := m.inputs[0].Value()
-			queue := m.inputs[1].Value()
+			queueName := m.inputs[1].Value()
 			fileName := m.inputs[2].Value()
 
 			if url == "" {
@@ -151,23 +151,42 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
-			if queue == "" {
-				queue = "Default"
+			if queueName == "" {
+				queueName = "Default"
 			}
 
 			download := models.Download{
-				FileName: fileName,
-				URL:      url,
-				Queue:    queue,
-				Status:   models.DownloadStatusQueued,
-				Progress: 0,
+				FileName:  fileName,
+				URL:       url,
+				QueueName: queueName,
+				Status:    models.DownloadStatusQueued,
+				Progress:  0,
 			}
 
 			// Add the download to the state
 			m.state.Downloads = append(m.state.Downloads, download)
 
+			// Create QueueManager for the selected queue
+			var queueManager *controller.QueueManager
+			for _, queue := range m.state.Queues {
+				if queue.Name == queueName {
+					queueManager = &controller.QueueManager{
+						Queue:           queue,                                      // Set the Queue
+						ActiveDownloads: 0,                                          // Initialize active downloads
+						DownloadChannel: make(chan struct{}, queue.MaxSimultaneous), // Control simultaneous downloads
+					}
+					break
+				}
+			}
+
+			if queueManager == nil {
+				m.statusMsg = "Error: Queue not found"
+				return m, nil
+			}
+
+			// Create the download in the controller, passing the queue manager
 			c := &controller.Download{Download: download}
-			c.Create()
+			c.Create(queueManager) // Pass the QueueManager to Create()
 
 			log.Infof("Added download info %#v", download)
 

@@ -3,9 +3,9 @@ package json
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/Amirali-Amirifar/gofetch.git/internal/config"
 	"os"
 
+	"github.com/Amirali-Amirifar/gofetch.git/internal/config"
 	"github.com/Amirali-Amirifar/gofetch.git/internal/models"
 )
 
@@ -19,7 +19,15 @@ func LoadAppState() (models.AppState, error) {
 		// Create default state if file doesn't exist
 		state = models.AppState{
 			Queues: []models.Queue{
-				{Name: config.DefaultQueueName, Folder: config.DefaultDownloadFolder, MaxDL: 3, Speed: config.DefaultDownloadSpeed, TimeRange: "24/7"},
+				{
+					Name:             config.DefaultQueueName,
+					StorageFolder:    config.DefaultDownloadFolder,
+					MaxSimultaneous:  config.DefaultMaxSimultaneous,
+					BandwidthLimit:   config.DefaultDownloadSpeed,
+					ActiveTimeStart:  config.DefaultActiveTimeStart,
+					ActiveTimeEnd:    config.DefaultActiveTimeEnd,
+					MaxRetryAttempts: config.DefaultMaxRetryAttempts,
+				},
 			},
 			Downloads: []models.Download{},
 		}

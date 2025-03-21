@@ -109,7 +109,7 @@ func (r *SQLiteRepository) SaveDownload(download models.Download) error {
 		"INSERT OR REPLACE INTO downloads (id, url, queue, file_name, status, progress, headers, content_length, content_type, accept_ranges, ranges_count, ranges) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		download.Id,
 		download.URL,
-		download.Queue,
+		download.QueueID,
 		download.FileName,
 		download.Status,
 		download.Progress,
@@ -128,7 +128,7 @@ func (r *SQLiteRepository) SaveDownload(download models.Download) error {
 }
 
 func (r *SQLiteRepository) GetDownloads() ([]models.Download, error) {
-	rows, err := r.Db.Query("SELECT id, url, queue, file_name, status, progress, headers, content_length, content_type, accept_ranges, ranges_count, ranges FROM downloads")
+	rows, err := r.Db.Query("SELECT id, url, queue_id, file_name, status, progress, headers, content_length, content_type, accept_ranges, ranges_count, ranges FROM downloads")
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +141,7 @@ func (r *SQLiteRepository) GetDownloads() ([]models.Download, error) {
 		err := rows.Scan(
 			&download.Id,
 			&download.URL,
-			&download.Queue,
+			&download.QueueID,
 			&download.FileName,
 			&download.Status,
 			&download.Progress,
@@ -186,7 +186,7 @@ func (r *SQLiteRepository) LoadAppState() (models.AppState, error) {
 	for rows.Next() {
 		var download models.Download
 		var headersJSON string
-		err := rows.Scan(&download.URL, &download.Queue, &download.FileName, &download.Status, &download.Progress, &headersJSON)
+		err := rows.Scan(&download.URL, &download.QueueID, &download.FileName, &download.Status, &download.Progress, &headersJSON)
 		if err != nil {
 			return state, err
 		}
@@ -208,7 +208,7 @@ func (r *SQLiteRepository) LoadAppState() (models.AppState, error) {
 
 	for rows.Next() {
 		var queue models.Queue
-		err := rows.Scan(&queue.Name, &queue.Folder, &queue.MaxDL, &queue.Speed, &queue.TimeRange)
+		err := rows.Scan(&queue.Id, queue.Name, &queue.StorageFolder, &queue.MaxSimultaneous, &queue.BandwidthLimit, &queue.ActiveTimeStart, &queue.ActiveTimeEnd, &queue.MaxRetryAttempts)
 		if err != nil {
 			return state, err
 		}
@@ -241,7 +241,7 @@ func (r *SQLiteRepository) SaveAppState(state models.AppState) error {
 		}
 		_, err = tx.Exec(
 			"INSERT INTO downloads (url, queue, file_name, status, progress, headers) VALUES (?, ?, ?, ?, ?, ?)",
-			download.URL, download.Queue, download.FileName, download.Status, download.Progress, string(headersJSON),
+			download.URL, download.QueueID, download.FileName, download.Status, download.Progress, string(headersJSON),
 		)
 		if err != nil {
 			return err
@@ -252,7 +252,7 @@ func (r *SQLiteRepository) SaveAppState(state models.AppState) error {
 	for _, queue := range state.Queues {
 		_, err := tx.Exec(
 			"INSERT INTO queues (name, folder, max_dl, speed, time_range) VALUES (?, ?, ?, ?, ?)",
-			queue.Name, queue.Folder, queue.MaxDL, queue.Speed, queue.TimeRange,
+			queue.Id, queue.Name, queue.StorageFolder, queue.MaxSimultaneous, queue.BandwidthLimit, queue.ActiveTimeStart, queue.ActiveTimeEnd, queue.MaxRetryAttempts,
 		)
 		if err != nil {
 			return err

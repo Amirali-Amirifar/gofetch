@@ -3,8 +3,9 @@ package views
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/charmbracelet/bubbles/key"
 	"os"
+
+	"github.com/charmbracelet/bubbles/key"
 
 	"github.com/Amirali-Amirifar/gofetch.git/internal/models"
 	"github.com/charmbracelet/bubbles/table"
@@ -36,12 +37,13 @@ func InitQueueList(state models.AppState) queueListModel {
 		{Title: "Folder", Width: 20},
 		{Title: "Max DL", Width: 7},
 		{Title: "Speed", Width: 10},
-		{Title: "Time Range", Width: 15},
+		{Title: "Time Start", Width: 15},
+		{Title: "Time End", Width: 15},
 	}
 
 	var rows []table.Row
 	for _, q := range state.Queues {
-		rows = append(rows, table.Row{q.Name, q.Folder, fmt.Sprintf("%d", q.MaxDL), q.Speed, q.TimeRange})
+		rows = append(rows, table.Row{q.Name, q.StorageFolder, fmt.Sprintf("%d", q.MaxSimultaneous, q.MaxDownloadSpeed), q.ActiveTimeStart, q.ActiveTimeEnd})
 	}
 
 	t := table.New(
@@ -70,7 +72,7 @@ func (m queueListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.table.Blur()
 			}
 		case "n": // Add new queue
-			newQueue := models.Queue{Name: "New Queue", Folder: "~/Downloads", MaxDL: 3, Speed: "1MB/s", TimeRange: "Anytime"}
+			newQueue := models.Queue{Name: "New Queue", StorageFolder: "~/Downloads", MaxSimultaneous: 3, MaxDownloadSpeed: 1, ActiveTimeStart: "Anytime", ActiveTimeEnd: "Anytime"}
 			m.state.Queues = append(m.state.Queues, newQueue)
 			m.updateTableRows()
 			if err := m.saveQueuesToFile(); err != nil {
@@ -128,7 +130,7 @@ func (m queueListModel) View() string {
 func (m *queueListModel) updateTableRows() {
 	var rows []table.Row
 	for _, q := range m.state.Queues {
-		rows = append(rows, table.Row{q.Name, q.Folder, fmt.Sprintf("%d", q.MaxDL), q.Speed, q.TimeRange})
+		rows = append(rows, table.Row{q.Name, q.StorageFolder, fmt.Sprintf("%d", q.MaxSimultaneous, q.MaxDownloadSpeed), q.ActiveTimeStart, q.ActiveTimeEnd})
 	}
 	m.table.SetRows(rows)
 }

@@ -43,7 +43,7 @@ func InitDownloadList(state models.AppState) downloadListModel {
 	for _, download := range downloads {
 		rows = append(rows, table.Row{
 			download.URL,
-			download.Queue,
+			download.QueueName,
 			string(download.Status),
 			fmt.Sprintf("%d%%", download.Progress),
 		})

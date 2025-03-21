@@ -9,24 +9,84 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/Amirali-Amirifar/gofetch.git/internal/config"
 	"github.com/Amirali-Amirifar/gofetch.git/internal/models"
 	log "github.com/sirupsen/logrus"
 )
 
+// Download represents a single download instance
+// It embeds the Download model from the models package
 type Download struct {
 	models.Download
 }
 
-func (d *Download) Create() {
+// QueueManager represents a queue of downloads with constraints on simultaneous downloads
+// and active time range
+type QueueManager struct {
+	models.Queue
+	ActiveDownloads int           // Current active downloads
+	DownloadChannel chan struct{} // Channel for managing active downloads
+	mu              sync.Mutex    // Mutex to ensure safe concurrent access to ActiveDownloads
+	DownloadLimiter chan struct{} // Token channel for limiting download speed (throttling)
+}
+
+// CanStartDownload checks whether a new download can be started
+// based on the time range and max simultaneous downloads constraints
+func (q *QueueManager) CanStartDownload() bool {
+	currentTime := time.Now()
+	start, _ := time.Parse("15:04", q.ActiveTimeStart)
+	end, _ := time.Parse("15:04", q.ActiveTimeEnd)
+
+	if q.ActiveTimeStart != "" && q.ActiveTimeEnd != "" {
+		if currentTime.Before(start) || currentTime.After(end) {
+			return false
+		}
+	}
+
+	// Locking the mutex to safely check and modify the number of active downloads
+	q.mu.Lock()
+	canStart := q.ActiveDownloads < q.MaxSimultaneous
+	q.mu.Unlock()
+
+	return canStart
+}
+
+// StartDownload initiates a download process if allowed by the queue constraints
+func (q *QueueManager) StartDownload(d *Download) {
+	if !q.CanStartDownload() {
+		log.Infof("Download %s is queued due to queue restrictions", d.URL)
+		d.Status = models.DownloadStatusQueued
+		return
+	}
+
+	// Locking the mutex to safely modify the active downloads count
+	q.mu.Lock()
+	q.ActiveDownloads++
+	q.mu.Unlock()
+
+	q.DownloadChannel <- struct{}{}
+	d.Status = models.DownloadStatusDownloading
+	log.Infof("Starting download: %s", d.URL)
+	d.start(q)
+
+	// Decrement active downloads after completion
+	q.mu.Lock()
+	q.ActiveDownloads--
+	q.mu.Unlock()
+
+	<-q.DownloadChannel
+}
+
+// Create initializes a new download and starts the download process if conditions allow
+func (d *Download) Create(queue *QueueManager) {
 	fileUrl := d.URL
 	log.Infof("Creating download for URL: %s", fileUrl)
-
-	// Set initial status
 	d.Status = models.DownloadStatusQueued
 
-	// Make the request
+	// Fetch the file metadata
 	response, err := http.Get(fileUrl)
 	if err != nil {
 		log.Errorf("Failed to fetch URL: %s, error: %v", fileUrl, err)
@@ -34,16 +94,14 @@ func (d *Download) Create() {
 		return
 	}
 	defer response.Body.Close()
-
-	// Capture headers
 	d.Headers = response.Header
 
-	// Check status code
 	if response.StatusCode != http.StatusOK {
 		log.Errorf("Non-OK HTTP status: %d", response.StatusCode)
 		return
 	}
 
+	// Extract content length if available
 	if contentLength := d.Headers.Get("Content-Length"); contentLength != "" {
 		d.ContentLength, err = strconv.ParseInt(contentLength, 10, 64)
 		if err != nil {
@@ -53,72 +111,58 @@ func (d *Download) Create() {
 	} else {
 		log.Warn("Missing Content-Length header")
 	}
-
 	d.AcceptRanges = d.Headers.Get("Accept-Ranges") == "bytes"
-
-	if contentDisposition := d.Headers.Get("Content-Disposition"); contentDisposition != "" {
-		_, params, err := mime.ParseMediaType(contentDisposition)
-
-		if err == nil {
-			if filename, exists := params["filename"]; exists {
-				d.FileName = filename
-				log.Infof("Extracted filename: %s", filename)
-			}
-		} else {
-			log.Warnf("Failed to parse Content-Disposition: %v", err)
-		}
-	}
-
-	if d.FileName == "" {
-		parsedURL, err := url.Parse(d.URL)
-		if err == nil {
-			segments := strings.Split(parsedURL.Path, "/")
-			d.FileName = segments[len(segments)-1]
-		}
-	}
-
-	if d.FileName == "" || !strings.Contains(d.FileName, ".") {
-		if contentType := d.Headers.Get("Content-Type"); contentType != "" {
-			ext, _ := mime.ExtensionsByType(contentType)
-			if len(ext) > 0 {
-				d.FileName = "download" + ext[0] // Default name with correct extension
-			}
-		}
-	}
+	d.FileName = extractFileName(d)
 
 	log.Infof("Completed capturing initial info of %s, the data are %#v", d.URL, d)
 	db := config.GetDB()
-	// Save download to database
 	if err := db.SaveDownload(d.Download); err != nil {
 		log.Errorf("Failed to save download to database: %v", err)
 		d.Status = models.DownloadStatusFailed
 		return
 	}
 
-	log.Infof("\nStarting the download process")
-
-	d.start()
+	queue.StartDownload(d)
 }
 
-func (d *Download) start() {
-	//if d.acceptRanges {
-	//	d.startParallel()
-	//} else {
-	//	d.startSingleThread()
-	//}
-
-	d.startSingleThread()
-}
-
-func (d *Download) startParallel() {}
-
-func (d *Download) startSingleThread() {
-	if d.FileName == "" {
-		log.Errorf("No filename provided")
-		d.FileName = "GoFetch_Download.tmp"
+// extractFileName attempts to determine the file name from the response headers or URL
+func extractFileName(d *Download) string {
+	if contentDisposition := d.Headers.Get("Content-Disposition"); contentDisposition != "" {
+		_, params, err := mime.ParseMediaType(contentDisposition)
+		if err == nil {
+			if filename, exists := params["filename"]; exists {
+				return filename
+			}
+		}
 	}
 
-	// Ensure DefaultDownloadFolder is properly expanded
+	parsedURL, err := url.Parse(d.URL)
+	if err == nil {
+		segments := strings.Split(parsedURL.Path, "/")
+		return segments[len(segments)-1]
+	}
+
+	if contentType := d.Headers.Get("Content-Type"); contentType != "" {
+		ext, _ := mime.ExtensionsByType(contentType)
+		if len(ext) > 0 {
+			return "download" + ext[0]
+		}
+	}
+
+	return "GoFetch_Download.tmp"
+}
+
+// start initiates the actual file download process
+func (d *Download) start(queue *QueueManager) {
+	d.startSingleThread(queue)
+}
+
+// startSingleThread handles downloading the file in a single-threaded manner
+func (d *Download) startSingleThread(queue *QueueManager) {
+	if d.FileName == "" {
+		d.FileName = "GoFetch_Download.tmp"
+	}
+	// Determine the download folder
 	downloadFolder := config.DefaultDownloadFolder
 	if strings.HasPrefix(downloadFolder, "~") {
 		homeDir, err := os.UserHomeDir()
@@ -127,11 +171,7 @@ func (d *Download) startSingleThread() {
 		}
 		downloadFolder = filepath.Join(homeDir, downloadFolder[2:])
 	}
-
-	// Set full file path
 	d.FileName = filepath.Join(downloadFolder, d.FileName)
-
-	// Ensure parent directories exist
 	err := os.MkdirAll(filepath.Dir(d.FileName), os.ModePerm)
 	if err != nil {
 		log.Fatalf("Failed to create directory %s: %v", filepath.Dir(d.FileName), err)
@@ -144,20 +184,31 @@ func (d *Download) startSingleThread() {
 	}
 	defer file.Close()
 
-	log.Infof("Created file %s", file.Name())
-
-	// Get the HTTP response
+	// Fetch file data
 	resp, err := http.Get(d.URL)
 	if err != nil {
 		log.Fatalf("Failed to download %s: %v", d.URL, err)
 	}
 	defer resp.Body.Close()
 
-	// Write response body to file
-	_, err = io.Copy(file, resp.Body)
-	if err != nil {
-		log.Fatalf("Failed to write to file %s: %v", d.FileName, err)
-	}
+	// Apply bandwidth limiting
+	limiter := queue.DownloadLimiter
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
 
-	log.Infof("Finished download process for %s", file.Name())
+	for {
+		select {
+		case <-ticker.C:
+			// Generate a token each second
+			limiter <- struct{}{}
+		case <-limiter:
+			// Proceed with download if token is available
+			_, err := io.Copy(file, resp.Body)
+			if err != nil {
+				log.Fatalf("Failed to write to file %s: %v", d.FileName, err)
+			}
+			log.Infof("Finished download process for %s", file.Name())
+			return
+		}
+	}
 }
